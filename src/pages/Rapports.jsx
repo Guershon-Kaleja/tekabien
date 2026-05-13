@@ -7,18 +7,18 @@ import usePlanCheck from '../hooks/usePlanCheck'
 
 export default function Rapports() {
   const navigate = useNavigate()
+  usePlanCheck()
   const [period, setPeriod] = useState('today')
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalSales: 0,
+    totalCost: 0,
     salesCount: 0,
     totalExpenses: 0,
     netProfit: 0,
     topProducts: [],
     paymentMethods: [],
   })
-
-  usePlanCheck()
 
   useEffect(() => { fetchStats() }, [period])
 
@@ -50,18 +50,21 @@ export default function Rapports() {
 
     if (salesData && expensesData) {
       const totalSales = salesData.reduce((sum, s) => sum + s.total, 0)
+      const totalCost = salesData.reduce((sum, s) => sum + (s.cost || 0), 0)
       const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
+      const netProfit = totalSales - totalCost - totalExpenses
 
       const productMap = {}
       salesData.forEach(s => {
         if (!productMap[s.product_name]) {
-          productMap[s.product_name] = { name: s.product_name, total: 0, count: 0 }
+          productMap[s.product_name] = { name: s.product_name, total: 0, margin: 0, count: 0 }
         }
         productMap[s.product_name].total += s.total
+        productMap[s.product_name].margin += s.total - (s.cost || 0)
         productMap[s.product_name].count += s.quantity
       })
       const topProducts = Object.values(productMap)
-        .sort((a, b) => b.total - a.total)
+        .sort((a, b) => b.margin - a.margin)
         .slice(0, 5)
 
       const paymentMap = {}
@@ -75,9 +78,10 @@ export default function Rapports() {
 
       setStats({
         totalSales,
+        totalCost,
         salesCount: salesData.length,
         totalExpenses,
-        netProfit: totalSales - totalExpenses,
+        netProfit,
         topProducts,
         paymentMethods,
       })
@@ -89,22 +93,16 @@ export default function Rapports() {
     new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
 
   const paymentLabel = (method) => ({
-    cash: 'Cash',
-    airtel: 'Airtel Money',
-    orange: 'Orange Money',
-    mpesa: 'M-Pesa',
-    credit: 'Crédit client'
+    cash: 'Cash', airtel: 'Airtel Money',
+    orange: 'Orange Money', mpesa: 'M-Pesa', credit: 'Crédit client'
   })[method] || method
 
   const paymentColor = (method) => ({
-    cash: '#16A34A',
-    airtel: '#EF4444',
-    orange: '#F97316',
-    mpesa: '#8B5CF6',
-    credit: '#F5A623'
+    cash: '#16A34A', airtel: '#EF4444',
+    orange: '#F97316', mpesa: '#8B5CF6', credit: '#F5A623'
   })[method] || '#64748B'
 
-  const maxProduct = stats.topProducts[0]?.total || 1
+  const maxMargin = stats.topProducts[0]?.margin || 1
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
@@ -117,7 +115,7 @@ export default function Rapports() {
             {stats.netProfit >= 0 ? '+' : ''}{formatFC(stats.netProfit)}
           </p>
           <p className="text-blue-200 text-xs mt-1">
-            {stats.netProfit >= 0 ? '✅ Tu gagnes de l\'argent' : '⚠️ Tu perds de l\'argent'}
+            {stats.netProfit >= 0 ? "✅ Tu gagnes de l'argent" : "⚠️ Tu perds de l'argent"}
           </p>
           <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-white/10 rounded-lg p-2 text-center">
@@ -125,12 +123,12 @@ export default function Rapports() {
               <p className="text-white font-bold text-sm">{formatFC(stats.totalSales)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2 text-center">
-              <p className="text-blue-200 text-xs mb-1">Dépenses</p>
-              <p className="text-red-300 font-bold text-sm">{formatFC(stats.totalExpenses)}</p>
+              <p className="text-blue-200 text-xs mb-1">Coût achat</p>
+              <p className="text-yellow-300 font-bold text-sm">{formatFC(stats.totalCost)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2 text-center">
-              <p className="text-blue-200 text-xs mb-1">Transactions</p>
-              <p className="text-white font-bold text-sm">{stats.salesCount}</p>
+              <p className="text-blue-200 text-xs mb-1">Dépenses</p>
+              <p className="text-red-300 font-bold text-sm">{formatFC(stats.totalExpenses)}</p>
             </div>
           </div>
         </div>
@@ -138,7 +136,6 @@ export default function Rapports() {
 
       <div className="px-4 pt-4">
 
-        {/* Période */}
         <div className="flex gap-2 mb-4">
           {[
             { id: 'today', label: "Aujourd'hui" },
@@ -163,9 +160,8 @@ export default function Rapports() {
           <p className="text-center text-[#64748B] text-sm py-8">Chargement...</p>
         ) : (
           <>
-            {/* Top produits */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-              Top produits
+              Top produits (par marge)
             </p>
 
             {stats.topProducts.length === 0 ? (
@@ -183,24 +179,25 @@ export default function Rapports() {
                         <span className="text-xs font-bold text-[#1A56DB] w-4">{i + 1}</span>
                         <p className="text-sm font-medium text-[#0F172A]">{p.name}</p>
                       </div>
-                      <p className="text-xs font-bold text-[#1A56DB]">{formatFC(p.total)}</p>
+                      <div className="text-right">
+                        <p className="text-xs font-bold text-[#16A34A]">+{formatFC(p.margin)}</p>
+                        <p className="text-xs text-[#64748B]">{p.count} vendus</p>
+                      </div>
                     </div>
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
                         style={{
-                          width: `${Math.round((p.total / maxProduct) * 100)}%`,
-                          background: '#1A56DB'
+                          width: `${Math.round((p.margin / maxMargin) * 100)}%`,
+                          background: '#16A34A'
                         }}
                       />
                     </div>
-                    <p className="text-xs text-[#64748B] mt-1">{p.count} unités vendues</p>
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Modes de paiement */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Modes de paiement
             </p>
@@ -225,7 +222,6 @@ export default function Rapports() {
               </div>
             )}
 
-            {/* Raccourcis */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Accès rapide
             </p>

@@ -213,6 +213,7 @@ export default function Ventes() {
       product_name: sanitize(selected.name),
       quantity,
       total,
+      cost: (selected.price_buy || 0) * quantity,
       payment_method: payment,
       customer_id: payment === 'credit' ? selectedClient?.id : null,
       customer_name: payment === 'credit' ? selectedClient?.name : null,

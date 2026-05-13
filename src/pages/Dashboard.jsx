@@ -72,9 +72,11 @@ export default function Dashboard() {
       .eq('user_id', user.id)
       .gte('created_at', startOfDay.toISOString())
 
-    if (expensesData) {
-      const totalExp = expensesData.reduce((sum, e) => sum + e.amount, 0)
-      setNetProfit((salesData?.reduce((sum, s) => sum + s.total, 0) || 0) - totalExp)
+    if (salesData && expensesData) {
+      const totalSales = salesData.reduce((sum, s) => sum + s.total, 0)
+      const totalCost = salesData.reduce((sum, s) => sum + (s.cost || 0), 0)
+      const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
+      setNetProfit(totalSales - totalCost - totalExpenses)
     }
 
     const { data: customersData } = await supabase
@@ -122,7 +124,6 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
 
-      {/* Header */}
       <div className="bg-[#1A56DB] px-4 pt-4 pb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -149,7 +150,6 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Bandeau plan */}
       {userPlan && userPlan !== 'admin' && (
         <div className={`px-4 py-3 flex items-center justify-between ${
           userPlan === 'trial' && trialDaysLeft <= 5 ? 'bg-[#FEF2F2]' :
@@ -207,14 +207,13 @@ export default function Dashboard() {
 
       <div className="px-4 pt-4">
 
-        {/* Métriques */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Bénéfice net</p>
             <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
               {formatFC(netProfit)}
             </p>
-            <p className="text-xs text-[#64748B] mt-1">après dépenses</p>
+            <p className="text-xs text-[#64748B] mt-1">marge - dépenses</p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Clients en dette</p>
@@ -223,7 +222,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Boutons */}
         <button
           onClick={() => navigate('/ventes')}
           className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm flex items-center justify-center gap-2 mb-2"
@@ -237,17 +235,16 @@ export default function Dashboard() {
           📦 Voir les stocks
         </button>
 
-        {/* Alertes */}
         {lowStock.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Alertes</p>
-             <p
-                onClick={() => navigate('/ventes?tab=history')}
+              <p
+                onClick={() => navigate('/stocks')}
                 className="text-xs text-[#1A56DB] cursor-pointer"
-                >
+              >
                 Voir tout
-             </p>
+              </p>
             </div>
             {lowStock.slice(0, 2).map((p) => (
               <div key={p.id} className="bg-white rounded-xl p-3 flex items-center gap-3 mb-2 border border-gray-200">
@@ -266,13 +263,12 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* Dernières ventes */}
         {lastSales.length > 0 && (
           <>
             <div className="flex items-center justify-between mb-2 mt-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Dernières ventes</p>
               <p
-                onClick={() => navigate('/ventes')}
+                onClick={() => navigate('/ventes?tab=history')}
                 className="text-xs text-[#1A56DB] cursor-pointer"
               >
                 Voir tout

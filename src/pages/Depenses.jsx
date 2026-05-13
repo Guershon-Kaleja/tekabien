@@ -55,7 +55,7 @@ export default function Depenses() {
 
     const { data: salesData } = await supabase
       .from('sales')
-      .select('total')
+      .select('total, cost')
       .eq('user_id', user.id)
       .gte('created_at', since)
 
@@ -125,8 +125,9 @@ export default function Depenses() {
     new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
 
   const totalIncome = sales.reduce((sum, s) => sum + s.total, 0)
+  const totalCost = sales.reduce((sum, s) => sum + (s.cost || 0), 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-  const netProfit = totalIncome - totalExpenses
+  const netProfit = totalIncome - totalCost - totalExpenses
 
   const getCategoryIcon = (cat) =>
     categories.find(c => c.id === cat)?.icon || '📌'
@@ -171,13 +172,17 @@ export default function Depenses() {
           <p className="text-blue-200 text-xs mt-1">
             {netProfit >= 0 ? "✅ Tu gagnes de l'argent" : "⚠️ Tu perds de l'argent"}
           </p>
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-white/10 rounded-lg p-2">
-              <p className="text-blue-200 text-xs mb-1">Entrées</p>
+              <p className="text-blue-200 text-xs mb-1">Ventes</p>
               <p className="text-green-300 font-bold text-sm">{formatFC(totalIncome)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2">
-              <p className="text-blue-200 text-xs mb-1">Sorties</p>
+              <p className="text-blue-200 text-xs mb-1">Coût achat</p>
+              <p className="text-yellow-300 font-bold text-sm">{formatFC(totalCost)}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-2">
+              <p className="text-blue-200 text-xs mb-1">Dépenses</p>
               <p className="text-red-300 font-bold text-sm">{formatFC(totalExpenses)}</p>
             </div>
           </div>
@@ -269,7 +274,6 @@ export default function Depenses() {
 
       </div>
 
-      {/* Modal ajout dépense */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
@@ -315,7 +319,6 @@ export default function Depenses() {
         </div>
       )}
 
-      {/* Modal modifier dépense */}
       {editExpense && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
@@ -361,7 +364,6 @@ export default function Depenses() {
         </div>
       )}
 
-      {/* Modal confirmation suppression */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-5">
