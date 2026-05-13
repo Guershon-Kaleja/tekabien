@@ -45,10 +45,15 @@ export const initiatePayment = async ({ phone, amount, currency = 'USD', plan })
     console.log('Réponse complète:', data)
 
     if (data?.success) {
+      // Utiliser l'orderNumber de Labyrinthe comme référence
+      const labyrinthRef = data.orderNumber || data.reference
+
+      console.log('Référence Labyrinthe:', labyrinthRef)
+
       await supabase.from('payments').insert({
         user_id: user.id,
-        reference: data.reference,
-        order_number: data.orderNumber,
+        reference: labyrinthRef,
+        order_number: labyrinthRef,
         plan,
         amount: parseFloat(amount),
         currency,
@@ -57,8 +62,8 @@ export const initiatePayment = async ({ phone, amount, currency = 'USD', plan })
 
       return {
         success: true,
-        reference: data.reference,
-        orderNumber: data.orderNumber,
+        reference: labyrinthRef,
+        orderNumber: labyrinthRef,
         message: data.message,
       }
     }

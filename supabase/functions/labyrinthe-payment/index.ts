@@ -21,10 +21,7 @@ serve(async (req) => {
 
     console.log('=== TekaBien Payment Function ===')
     console.log('Action:', action)
-    console.log('Token présent:', !!LABYRINTHE_TOKEN)
-    console.log('Token longueur:', LABYRINTHE_TOKEN?.length)
     console.log('Body reçu:', JSON.stringify(body))
-    console.log('Callback URL:', CALLBACK_URL)
 
     if (action === 'pay') {
       const payloadToLabyrinthe = {
@@ -45,8 +42,20 @@ serve(async (req) => {
       })
 
       const data = await response.json()
-      console.log('Réponse Labyrinthe status:', response.status)
-      console.log('Réponse Labyrinthe data:', JSON.stringify(data))
+      console.log('Réponse Labyrinthe:', JSON.stringify(data))
+
+      // Utiliser orderNumber de Labyrinthe comme référence
+      if (data?.success) {
+        return new Response(JSON.stringify({
+          success: true,
+          reference: data.orderNumber,  // on utilise orderNumber de Labyrinthe
+          orderNumber: data.orderNumber,
+          message: data.message,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        })
+      }
 
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
