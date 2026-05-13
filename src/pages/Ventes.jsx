@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import { canAddSale, getPlanLimits } from '../lib/planLimits'
-import { saveSaleOffline, getPendingSales, getCleanPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
+import { saveSaleOffline, getCleanPendingSales, getPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -38,9 +38,31 @@ export default function Ventes() {
   const [salesLoading, setSalesLoading] = useState(false)
   const [historyFilter, setHistoryFilter] = useState('today')
 
-  const checkPendingSales = async (uid) => {
-    const pending = await getPendingSales(uid)
-    setPendingCount(pending.length)
+  const syncPendingSales = async (uid) => {
+    try {
+      const id = uid || userId
+      if (!id) {
+        setPendingCount(0)
+        return
+      }
+
+      const pending = await getCleanPendingSales(id)
+      if (pending.length === 0) {
+        setPendingCount(0)
+        return
+      }
+
+      for (const { local_id, saleData } of pending) {
+        const { error } = await supabase.from('sales').insert(saleData)
+        if (!error) await markSaleSynced(local_id)
+      }
+
+      setPendingCount(0)
+      fetchData()
+    } catch (err) {
+      console.error('Erreur synchronisation:', err)
+      setPendingCount(0)
+    }
   }
 
   const fetchData = async () => {
@@ -78,7 +100,12 @@ export default function Ventes() {
       .gte('created_at', startOfDay.toISOString())
     if (salesData) setTodaySalesCount(salesData.length)
 
-    checkPendingSales(user.id)  
+    // Vérifier et synchroniser les ventes en attente
+    const pending = await getCleanPendingSales(user.id)
+    setPendingCount(pending.length)
+    if (pending.length > 0 && navigator.onLine) {
+      syncPendingSales(user.id)
+    }
   }
 
   const fetchAllSales = async () => {
@@ -107,23 +134,6 @@ export default function Ventes() {
     setSalesLoading(false)
   }
 
-  const syncPendingSales = async () => {
-    try {
-      const pending = await getCleanPendingSales(userId)
-      if (pending.length === 0) return
-
-      for (const { local_id, saleData } of pending) {
-        const { error } = await supabase.from('sales').insert(saleData)
-        if (!error) await markSaleSynced(local_id)
-      }
-
-      setPendingCount(0)
-      fetchData()
-    } catch (err) {
-      console.error('Erreur synchronisation:', err)
-    }
-  }
-
   useEffect(() => {
     fetchData()
 
@@ -131,7 +141,8 @@ export default function Ventes() {
       setOnline(true)
       setShowOnlineBanner(true)
       setTimeout(() => setShowOnlineBanner(false), 3000)
-      syncPendingSales()
+      // userId peut ne pas être disponible ici, fetchData va gérer la sync
+      fetchData()
     }
     const handleOffline = () => setOnline(false)
 
@@ -298,7 +309,6 @@ export default function Ventes() {
 
       <Header title="Ventes" />
 
-      {/* Onglets */}
       <div className="flex bg-white border-b border-gray-200">
         <button
           onClick={() => setActiveTab('new')}
@@ -322,7 +332,6 @@ export default function Ventes() {
         </button>
       </div>
 
-      {/* ── ONGLET NOUVELLE VENTE ── */}
       {activeTab === 'new' && (
         <>
           {!online ? (
@@ -603,7 +612,6 @@ export default function Ventes() {
         </>
       )}
 
-      {/* ── ONGLET HISTORIQUE ── */}
       {activeTab === 'history' && (
         <div className="px-4 pt-4 pb-8">
 
@@ -688,7 +696,6 @@ export default function Ventes() {
         </div>
       )}
 
-      {/* Modal sélecteur client */}
       {showClientPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[70vh] flex flex-col">
