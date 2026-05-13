@@ -141,6 +141,7 @@ export default function Ventes() {
     if (salesData) setTodaySalesCount(salesData.length)
 
     const pending = await getCleanPendingSales(user.id)
+    console.log('=== PENDING SALES ===', pending.length, JSON.stringify(pending))
     setPendingCount(pending.length)
     if (pending.length > 0 && navigator.onLine) {
       syncPendingSales(user.id)

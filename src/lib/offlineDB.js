@@ -32,6 +32,7 @@ export const saveSaleOffline = async (sale) => {
       synced: 0,
       created_at: new Date().toISOString(),
     }
+    console.log('=== SAVING OFFLINE ===', JSON.stringify(saleWithId))
     const request = store.add(saleWithId)
     request.onsuccess = () => resolve(saleWithId)
     request.onerror = () => reject(request.error)
