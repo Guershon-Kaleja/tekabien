@@ -63,9 +63,13 @@ export default function Ventes() {
       }
 
       for (const { local_id, saleData } of pending) {
+        console.log('Syncing sale:', JSON.stringify(saleData))
         const { error } = await supabase.from('sales').insert(saleData)
+        console.log('Insert error:', error)
         if (!error) {
           await markSaleSynced(local_id)
+          console.log('product_id:', saleData.product_id)
+          console.log('quantity:', saleData.quantity)
 
           // Mettre à jour le stock dans Supabase
           if (saleData.product_id) {
