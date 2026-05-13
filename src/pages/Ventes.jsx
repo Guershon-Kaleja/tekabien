@@ -63,6 +63,11 @@ export default function Ventes() {
       }
 
       for (const { local_id, saleData } of pending) {
+        console.log('=== SYNC SALE ===')
+        console.log('local_id:', local_id)
+        console.log('saleData complet:', JSON.stringify(saleData))
+        console.log('product_id:', saleData.product_id)
+        console.log('quantity:', saleData.quantity)
         console.log('Syncing sale:', JSON.stringify(saleData))
         const { error } = await supabase.from('sales').insert(saleData)
         console.log('Insert error:', error)
