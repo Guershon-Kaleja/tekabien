@@ -64,7 +64,25 @@ export default function Ventes() {
 
       for (const { local_id, saleData } of pending) {
         const { error } = await supabase.from('sales').insert(saleData)
-        if (!error) await markSaleSynced(local_id)
+        if (!error) {
+          await markSaleSynced(local_id)
+
+          // Mettre à jour le stock dans Supabase
+          if (saleData.product_id) {
+            const { data: product } = await supabase
+              .from('products')
+              .select('quantity')
+              .eq('id', saleData.product_id)
+              .single()
+
+            if (product) {
+              await supabase
+                .from('products')
+                .update({ quantity: Math.max(0, product.quantity - saleData.quantity) })
+                .eq('id', saleData.product_id)
+            }
+          }
+        }
       }
 
       setPendingCount(0)
