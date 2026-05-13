@@ -92,41 +92,52 @@ export default function Expired() {
     setError('')
     setChecking(true)
 
-    const result = await checkPaymentStatus(orderNumber)
+    let attempts = 0
+    const maxAttempts = 10
 
-    if (result.paid) {
-      const { data: { session } } = await supabase.auth.getSession()
-      const user = session?.user
-      if (!user) return
+    const check = async () => {
+      attempts++
+      const result = await checkPaymentStatus(orderNumber)
 
-      const { data: currentUser } = await supabase
-        .from('users')
-        .select('plan_expires')
-        .eq('id', user.id)
-        .single()
+      if (result.paid) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const user = session?.user
+        if (!user) return
 
-      const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
-        ? new Date(currentUser.plan_expires)
-        : new Date()
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('plan_expires')
+          .eq('id', user.id)
+          .single()
 
-      const expires = new Date(baseDate)
-      expires.setMonth(expires.getMonth() + 1)
+        const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
+          ? new Date(currentUser.plan_expires)
+          : new Date()
 
-      await supabase
-        .from('users')
-        .update({ plan, plan_expires: expires.toISOString() })
-        .eq('id', user.id)
+        const expires = new Date(baseDate)
+        expires.setMonth(expires.getMonth() + 1)
 
-      setStep('success')
-      setTimeout(() => navigate('/'), 2000)
-    } else if (result.failed) {
-      setError('Paiement échoué — solde insuffisant ou annulé. Réessaie avec un autre numéro.')
-      setStep('choice')
-    } else {
-      setError('Paiement en attente. Attends quelques secondes et réessaie.')
+        await supabase
+          .from('users')
+          .update({ plan, plan_expires: expires.toISOString() })
+          .eq('id', user.id)
+
+        setChecking(false)
+        setStep('success')
+        setTimeout(() => navigate('/'), 2000)
+      } else if (result.failed) {
+        setChecking(false)
+        setError('Paiement échoué — solde insuffisant ou annulé. Réessaie avec un autre numéro.')
+        setStep('choice')
+      } else if (attempts < maxAttempts) {
+        setTimeout(check, 3000)
+      } else {
+        setChecking(false)
+        setError('Délai dépassé — si tu as payé, clique à nouveau sur "J\'ai confirmé".')
+      }
     }
 
-    setChecking(false)
+    await check()
   }
 
   const formatPrice = (p, c) => {
@@ -198,7 +209,7 @@ export default function Expired() {
                 Choisis ton plan
               </p>
 
-              <div className="grid grid-cols-2 gap-3 mb-5">
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 {[
                   { id: 'pro', label: 'Pro', desc: 'Pour les boutiques individuelles' },
                   { id: 'business', label: 'Business', desc: 'Multi-utilisateurs + SMS' },
@@ -321,6 +332,14 @@ export default function Expired() {
                 </p>
               </div>
 
+              {checking && (
+                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-[#1A56DB] font-medium text-center">
+                    🔄 Vérification en cours... Attends quelques secondes.
+                  </p>
+                </div>
+              )}
+
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                   <p className="text-xs text-[#DC2626] font-medium">{error}</p>
@@ -333,19 +352,21 @@ export default function Expired() {
                 disabled={checking}
                 className="w-full bg-[#16A34A] text-white rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
               >
-                {checking ? 'Vérification...' : "J'ai confirmé le paiement ✓"}
+                {checking ? 'Vérification automatique...' : "J'ai confirmé le paiement ✓"}
               </button>
 
               <button
                 onClick={() => { setStep('choice'); setError(''); setOrderNumber('') }}
-                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2"
+                disabled={checking}
+                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2 disabled:opacity-50"
               >
                 Réessayer avec un autre numéro
               </button>
 
               <button
                 onClick={() => navigate('/')}
-                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm"
+                disabled={checking}
+                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
               >
                 ← Retour au dashboard
               </button>

@@ -22,45 +22,63 @@ serve(async (req) => {
 
     console.log('Status code:', statusCode)
     console.log('Reference:', reference)
-    console.log('OrderNumber:', orderNumber)
 
-    // Status 2 = Succès selon la documentation
-    if (statusCode === 2 && reference) {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      )
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
 
-      // Chercher la transaction en attente par référence
-      const { data: pendingPayment } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('reference', reference)
-        .eq('status', 'pending')
-        .single()
+    if (reference) {
+      if (statusCode === 2) {
+        // Paiement réussi
+        const { data: payment } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('reference', reference)
+          .single()
 
-      console.log('Paiement trouvé:', JSON.stringify(pendingPayment))
+        console.log('Payment trouvé:', JSON.stringify(payment))
 
-      if (pendingPayment) {
-        const expires = new Date()
-        expires.setMonth(expires.getMonth() + 1)
+        if (payment) {
+          // Mettre à jour le statut du paiement
+          await supabase
+            .from('payments')
+            .update({ status: 'completed', order_number: orderNumber })
+            .eq('reference', reference)
 
-        // Activer le plan
-        await supabase
-          .from('users')
-          .update({
-            plan: pendingPayment.plan,
-            plan_expires: expires.toISOString()
-          })
-          .eq('id', pendingPayment.user_id)
+          // Calculer la nouvelle date d'expiration
+          const { data: currentUser } = await supabase
+            .from('users')
+            .select('plan_expires')
+            .eq('id', payment.user_id)
+            .single()
 
-        // Marquer le paiement comme complété
+          const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
+            ? new Date(currentUser.plan_expires)
+            : new Date()
+
+          const expires = new Date(baseDate)
+          expires.setMonth(expires.getMonth() + 1)
+
+          // Activer le plan
+          await supabase
+            .from('users')
+            .update({
+              plan: payment.plan,
+              plan_expires: expires.toISOString()
+            })
+            .eq('id', payment.user_id)
+
+          console.log('Plan activé pour user:', payment.user_id)
+        }
+      } else if (statusCode === 3) {
+        // Paiement échoué
         await supabase
           .from('payments')
-          .update({ status: 'completed', order_number: orderNumber })
+          .update({ status: 'failed' })
           .eq('reference', reference)
 
-        console.log('Plan activé pour user:', pendingPayment.user_id)
+        console.log('Paiement échoué pour reference:', reference)
       }
     }
 

@@ -81,8 +81,6 @@ export const checkPaymentStatus = async (reference) => {
       .eq('reference', reference)
       .single()
 
-    console.log('Payment status from DB:', data, error)
-
     if (error) throw new Error(error.message)
 
     return {
