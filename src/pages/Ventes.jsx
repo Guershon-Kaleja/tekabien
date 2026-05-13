@@ -38,6 +38,16 @@ export default function Ventes() {
   const [salesLoading, setSalesLoading] = useState(false)
   const [historyFilter, setHistoryFilter] = useState('today')
 
+  const paymentLabel = (method) => ({
+    cash: 'Cash', airtel: 'Airtel Money',
+    orange: 'Orange Money', mpesa: 'M-Pesa', credit: 'Crédit'
+  })[method] || method
+
+  const paymentColor = (method) => ({
+    cash: '#16A34A', airtel: '#EF4444',
+    orange: '#F97316', mpesa: '#8B5CF6', credit: '#F5A623'
+  })[method] || '#64748B'
+
   const syncPendingSales = async (uid) => {
     try {
       const id = uid || userId
@@ -100,7 +110,6 @@ export default function Ventes() {
       .gte('created_at', startOfDay.toISOString())
     if (salesData) setTodaySalesCount(salesData.length)
 
-    // Vérifier et synchroniser les ventes en attente
     const pending = await getCleanPendingSales(user.id)
     setPendingCount(pending.length)
     if (pending.length > 0 && navigator.onLine) {
@@ -141,7 +150,6 @@ export default function Ventes() {
       setOnline(true)
       setShowOnlineBanner(true)
       setTimeout(() => setShowOnlineBanner(false), 3000)
-      // userId peut ne pas être disponible ici, fetchData va gérer la sync
       fetchData()
     }
     const handleOffline = () => setOnline(false)
@@ -190,16 +198,6 @@ export default function Ventes() {
     })
   }
 
-  const paymentLabel = (method) => ({
-    cash: 'Cash', airtel: 'Airtel Money',
-    orange: 'Orange Money', mpesa: 'M-Pesa', credit: 'Crédit'
-  })[method] || method
-
-  const paymentColor = (method) => ({
-    cash: '#16A34A', airtel: '#EF4444',
-    orange: '#F97316', mpesa: '#8B5CF6', credit: '#F5A623'
-  })[method] || '#64748B'
-
   const handleConfirm = async () => {
     if (!selected) { setError('Sélectionne un produit'); return }
     if (quantity <= 0) { setError('La quantité doit être supérieure à 0'); return }
@@ -235,6 +233,14 @@ export default function Ventes() {
       setPendingCount(prev => prev + 1)
       setSuccess(true)
       setTodaySalesCount(prev => prev + 1)
+
+      // Mettre à jour le stock localement
+      setProducts(prev => prev.map(p =>
+        p.id === selected.id
+          ? { ...p, quantity: p.quantity - quantity }
+          : p
+      ))
+
       setTimeout(() => {
         setSuccess(false)
         setSelected(null)
