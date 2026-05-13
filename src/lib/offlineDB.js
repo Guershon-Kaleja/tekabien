@@ -48,6 +48,14 @@ export const getPendingSales = async () => {
   })
 }
 
+export const getCleanPendingSales = async () => {
+  const pending = await getPendingSales()
+  return pending.map(({ local_id, ...saleData }) => ({
+    local_id,
+    saleData
+  }))
+}
+
 export const markSaleSynced = async (localId) => {
   const db = await openDB()
   return new Promise((resolve, reject) => {
@@ -61,6 +69,8 @@ export const markSaleSynced = async (localId) => {
         const putRequest = store.put(sale)
         putRequest.onsuccess = () => resolve()
         putRequest.onerror = () => reject(putRequest.error)
+      } else {
+        resolve()
       }
     }
     getRequest.onerror = () => reject(getRequest.error)

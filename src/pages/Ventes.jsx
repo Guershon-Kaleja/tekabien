@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import { canAddSale, getPlanLimits } from '../lib/planLimits'
-import { saveSaleOffline, getPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
+import { saveSaleOffline, getPendingSales, getCleanPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -32,6 +32,7 @@ export default function Ventes() {
   const [todaySalesCount, setTodaySalesCount] = useState(0)
   const [error, setError] = useState('')
   const [online, setOnline] = useState(isOnline())
+  const [showOnlineBanner, setShowOnlineBanner] = useState(true)
   const [pendingCount, setPendingCount] = useState(0)
   const [allSales, setAllSales] = useState([])
   const [salesLoading, setSalesLoading] = useState(false)
@@ -106,12 +107,10 @@ export default function Ventes() {
 
   const syncPendingSales = async () => {
     try {
-      const pending = await getPendingSales()
+      const pending = await getCleanPendingSales()
       if (pending.length === 0) return
 
-      for (const sale of pending) {
-        const { local_id, ...saleData } = sale
-        delete saleData.synced
+      for (const { local_id, saleData } of pending) {
         const { error } = await supabase.from('sales').insert(saleData)
         if (!error) await markSaleSynced(local_id)
       }
@@ -125,9 +124,12 @@ export default function Ventes() {
 
   useEffect(() => {
     fetchData()
+    checkPendingSales()
 
     const handleOnline = () => {
       setOnline(true)
+      setShowOnlineBanner(true)
+      setTimeout(() => setShowOnlineBanner(false), 3000)
       syncPendingSales()
     }
     const handleOffline = () => setOnline(false)
@@ -135,9 +137,10 @@ export default function Ventes() {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
-    checkPendingSales()
+    const timer = setTimeout(() => setShowOnlineBanner(false), 3000)
 
     return () => {
+      clearTimeout(timer)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
@@ -268,6 +271,7 @@ export default function Ventes() {
       }, 1500)
     } else {
       setError("Erreur lors de l'enregistrement — réessaie")
+      console.error('Sale error:', saleError)
     }
 
     setLoading(false)
@@ -339,14 +343,14 @@ export default function Ventes() {
                 {pendingCount} vente{pendingCount > 1 ? 's' : ''} en cours de synchronisation...
               </p>
             </div>
-          ) : (
+          ) : showOnlineBanner ? (
             <div className="bg-[#F0FDF4] border-b border-green-200 px-4 py-2 flex items-center gap-2">
               <span className="text-sm">✅</span>
               <p className="text-xs text-[#16A34A] font-medium">
                 Connecté — synchronisation automatique active
               </p>
             </div>
-          )}
+          ) : null}
 
           {limitReached && (
             <div className="bg-[#FEF2F2] px-4 py-3 flex items-center justify-between border-b border-red-200">

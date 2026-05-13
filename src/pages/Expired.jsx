@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { initiatePayment, checkPaymentStatus } from '../lib/labyrinthe'
@@ -12,6 +12,31 @@ export default function Expired() {
   const [error, setError] = useState('')
   const [orderNumber, setOrderNumber] = useState('')
   const [checking, setChecking] = useState(false)
+  const [hasActivePlan, setHasActivePlan] = useState(false)
+  const [currentPlan, setCurrentPlan] = useState(null)
+
+  useEffect(() => {
+    const checkPlan = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data } = await supabase
+        .from('users')
+        .select('plan, plan_expires')
+        .eq('id', session.user.id)
+        .single()
+
+      if (data) {
+        setCurrentPlan(data.plan)
+        if (data.plan === 'pro' || data.plan === 'business') {
+          const expires = new Date(data.plan_expires)
+          const grace = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
+          if (new Date() < grace) setHasActivePlan(true)
+        }
+      }
+    }
+    checkPlan()
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -103,30 +128,52 @@ export default function Expired() {
         <div className="bg-[#1A56DB] p-6 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <span className="text-4xl">
-              {step === 'success' ? '🎉' : '⏰'}
+              {step === 'success' ? '🎉' : hasActivePlan ? '💳' : '⏰'}
             </span>
           </div>
           <h1 className="text-white font-bold text-xl">
-            {step === 'success' ? 'Paiement confirmé !' : 'Essai terminé'}
+            {step === 'success'
+              ? 'Paiement confirmé !'
+              : hasActivePlan
+              ? 'Renouveler mon abonnement'
+              : 'Essai terminé'}
           </h1>
           <p className="text-blue-200 text-sm mt-1">
             {step === 'success'
               ? 'Ton plan est actif. Redirection...'
+              : hasActivePlan
+              ? 'Continue à utiliser TekaBien sans interruption'
               : 'Ton essai gratuit de 30 jours est expiré'
             }
           </p>
+          {hasActivePlan && currentPlan && (
+            <span className="inline-block mt-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">
+              Plan {currentPlan === 'pro' ? 'Pro' : 'Business'} actif
+            </span>
+          )}
         </div>
 
         <div className="p-6">
 
           {step === 'choice' && (
             <>
-              <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-4 mb-5">
-                <p className="text-[#16A34A] font-bold text-sm mb-1">Continue avec TekaBien Pro</p>
-                <p className="text-[#16A34A] text-xs leading-relaxed">
-                  Toutes tes données sont sauvegardées. Continue à gérer ta boutique.
-                </p>
-              </div>
+              {!hasActivePlan && (
+                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-4 mb-5">
+                  <p className="text-[#16A34A] font-bold text-sm mb-1">Continue avec TekaBien Pro</p>
+                  <p className="text-[#16A34A] text-xs leading-relaxed">
+                    Toutes tes données sont sauvegardées. Continue à gérer ta boutique.
+                  </p>
+                </div>
+              )}
+
+              {hasActivePlan && (
+                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-5">
+                  <p className="text-[#1A56DB] font-bold text-sm mb-1">Renouvellement anticipé</p>
+                  <p className="text-[#1A56DB] text-xs leading-relaxed">
+                    Tu peux renouveler ton abonnement maintenant pour éviter toute interruption de service.
+                  </p>
+                </div>
+              )}
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
@@ -208,6 +255,15 @@ export default function Expired() {
                 {loading ? 'Envoi de la demande...' : `Payer ${plan === 'pro' ? '3$' : '6$'}/mois`}
               </button>
 
+              {hasActivePlan && (
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm mb-3"
+                >
+                  ← Retour au dashboard
+                </button>
+              )}
+
               <button
                 onClick={handleLogout}
                 className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
@@ -251,15 +307,20 @@ export default function Expired() {
               </button>
 
               <button
-                onClick={() => {
-                  setStep('choice')
-                  setError('')
-                  setOrderNumber('')
-                }}
+                onClick={() => { setStep('choice'); setError(''); setOrderNumber('') }}
                 className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2"
               >
                 Réessayer avec un autre numéro
               </button>
+
+              {hasActivePlan && (
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm mb-2"
+                >
+                  ← Retour au dashboard
+                </button>
+              )}
 
               <button
                 onClick={handleLogout}
@@ -273,7 +334,9 @@ export default function Expired() {
           {step === 'success' && (
             <div className="text-center py-4">
               <p className="text-4xl mb-4">🎉</p>
-              <p className="text-lg font-bold text-[#0F172A] mb-2">Bienvenue dans TekaBien Pro !</p>
+              <p className="text-lg font-bold text-[#0F172A] mb-2">
+                {hasActivePlan ? 'Abonnement renouvelé !' : 'Bienvenue dans TekaBien Pro !'}
+              </p>
               <p className="text-sm text-[#64748B]">Redirection vers ton dashboard...</p>
             </div>
           )}
