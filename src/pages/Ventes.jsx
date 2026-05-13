@@ -64,31 +64,34 @@ export default function Ventes() {
 
       for (const { local_id, saleData } of pending) {
         console.log('=== SYNC SALE ===')
-        console.log('local_id:', local_id)
-        console.log('saleData complet:', JSON.stringify(saleData))
-        console.log('product_id:', saleData.product_id)
-        console.log('quantity:', saleData.quantity)
-        console.log('Syncing sale:', JSON.stringify(saleData))
-        const { error } = await supabase.from('sales').insert(saleData)
-        console.log('Insert error:', error)
-        if (!error) {
+        console.log('saleData:', JSON.stringify(saleData))
+
+        const { error: saleError } = await supabase.from('sales').insert(saleData)
+        console.log('Sale insert error:', saleError)
+
+        if (!saleError) {
           await markSaleSynced(local_id)
-          console.log('product_id:', saleData.product_id)
-          console.log('quantity:', saleData.quantity)
 
           // Mettre à jour le stock dans Supabase
           if (saleData.product_id) {
-            const { data: product } = await supabase
+            const { data: product, error: productError } = await supabase
               .from('products')
               .select('quantity')
               .eq('id', saleData.product_id)
+              .eq('user_id', id)
               .single()
 
+            console.log('Product found:', product, 'error:', productError)
+
             if (product) {
-              await supabase
+              const newQty = Math.max(0, product.quantity - saleData.quantity)
+              const { error: updateError } = await supabase
                 .from('products')
-                .update({ quantity: Math.max(0, product.quantity - saleData.quantity) })
+                .update({ quantity: newQty })
                 .eq('id', saleData.product_id)
+                .eq('user_id', id)
+
+              console.log('Stock update error:', updateError, 'new qty:', newQty)
             }
           }
         }
