@@ -38,8 +38,8 @@ export default function Ventes() {
   const [salesLoading, setSalesLoading] = useState(false)
   const [historyFilter, setHistoryFilter] = useState('today')
 
-  const checkPendingSales = async () => {
-    const pending = await getPendingSales()
+  const checkPendingSales = async (uid) => {
+    const pending = await getPendingSales(uid)
     setPendingCount(pending.length)
   }
 
@@ -77,6 +77,8 @@ export default function Ventes() {
       .eq('user_id', user.id)
       .gte('created_at', startOfDay.toISOString())
     if (salesData) setTodaySalesCount(salesData.length)
+
+    checkPendingSales(user.id)  
   }
 
   const fetchAllSales = async () => {
@@ -107,7 +109,7 @@ export default function Ventes() {
 
   const syncPendingSales = async () => {
     try {
-      const pending = await getCleanPendingSales()
+      const pending = await getCleanPendingSales(userId)
       if (pending.length === 0) return
 
       for (const { local_id, saleData } of pending) {
@@ -124,7 +126,6 @@ export default function Ventes() {
 
   useEffect(() => {
     fetchData()
-    checkPendingSales()
 
     const handleOnline = () => {
       setOnline(true)

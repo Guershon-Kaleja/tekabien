@@ -7,6 +7,7 @@ export default function Expired() {
   const navigate = useNavigate()
   const [step, setStep] = useState('choice')
   const [plan, setPlan] = useState('pro')
+  const [currency, setCurrency] = useState('USD')
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -14,6 +15,11 @@ export default function Expired() {
   const [checking, setChecking] = useState(false)
   const [hasActivePlan, setHasActivePlan] = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
+
+  const prices = {
+    pro: { USD: 0.1, CDF: 280 },
+    business: { USD: 0.2, CDF: 560 },
+  }
 
   useEffect(() => {
     const checkPlan = async () => {
@@ -38,11 +44,6 @@ export default function Expired() {
     checkPlan()
   }, [])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    window.location.href = '/login'
-  }
-
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
     if (/^0(99|97|98)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444', icon: '📱' }
@@ -64,12 +65,12 @@ export default function Expired() {
     setError('')
     setLoading(true)
 
-    const amount = plan === 'pro' ? 0.1 : 0.2
+    const amount = prices[plan][currency]
 
     const result = await initiatePayment({
       phone,
       amount,
-      currency: 'USD',
+      currency,
       plan,
     })
 
@@ -98,15 +99,22 @@ export default function Expired() {
       const user = session?.user
       if (!user) return
 
-      const expires = new Date()
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('plan_expires')
+        .eq('id', user.id)
+        .single()
+
+      const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
+        ? new Date(currentUser.plan_expires)
+        : new Date()
+
+      const expires = new Date(baseDate)
       expires.setMonth(expires.getMonth() + 1)
 
       await supabase
         .from('users')
-        .update({
-          plan,
-          plan_expires: expires.toISOString()
-        })
+        .update({ plan, plan_expires: expires.toISOString() })
         .eq('id', user.id)
 
       setStep('success')
@@ -119,6 +127,11 @@ export default function Expired() {
     }
 
     setChecking(false)
+  }
+
+  const formatPrice = (p, c) => {
+    if (c === 'USD') return `${prices[p].USD}$`
+    return `${prices[p].CDF.toLocaleString('fr-FR')} FC`
   }
 
   return (
@@ -170,7 +183,7 @@ export default function Expired() {
                 <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-5">
                   <p className="text-[#1A56DB] font-bold text-sm mb-1">Renouvellement anticipé</p>
                   <p className="text-[#1A56DB] text-xs leading-relaxed">
-                    Tu peux renouveler ton abonnement maintenant pour éviter toute interruption de service.
+                    Le mois supplémentaire sera ajouté à ta date d'expiration actuelle — tu ne perds aucun jour.
                   </p>
                 </div>
               )}
@@ -187,8 +200,8 @@ export default function Expired() {
 
               <div className="grid grid-cols-2 gap-3 mb-5">
                 {[
-                  { id: 'pro', price: '3$', label: 'Pro', desc: 'Pour les boutiques individuelles' },
-                  { id: 'business', price: '6$', label: 'Business', desc: 'Multi-utilisateurs + SMS' },
+                  { id: 'pro', label: 'Pro', desc: 'Pour les boutiques individuelles' },
+                  { id: 'business', label: 'Business', desc: 'Multi-utilisateurs + SMS' },
                 ].map((p) => (
                   <button
                     key={p.id}
@@ -199,9 +212,34 @@ export default function Expired() {
                         : 'border-gray-200 bg-white'
                     }`}
                   >
-                    <p className="text-xl font-bold text-[#1A56DB]">{p.price}</p>
+                    <p className="text-lg font-bold text-[#1A56DB]">{formatPrice(p.id, currency)}</p>
                     <p className="text-xs font-semibold text-[#0F172A]">{p.label}/mois</p>
                     <p className="text-xs text-[#64748B] mt-1">{p.desc}</p>
+                  </button>
+                ))}
+              </div>
+
+              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
+                Devise de paiement
+              </p>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {[
+                  { id: 'USD', label: 'Dollar américain', symbol: '$' },
+                  { id: 'CDF', label: 'Franc congolais', symbol: 'FC' },
+                ].map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCurrency(c.id)}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      currency === c.id
+                        ? 'border-[#1A56DB] bg-[#EBF2FF]'
+                        : 'border-gray-200 bg-white'
+                    }`}
+                  >
+                    <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
+                    <p className="text-xs font-semibold text-[#0F172A]">{c.id}</p>
+                    <p className="text-xs text-[#64748B] mt-1">{c.label}</p>
                   </button>
                 ))}
               </div>
@@ -252,23 +290,14 @@ export default function Expired() {
                 disabled={loading}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3 disabled:opacity-50"
               >
-                {loading ? 'Envoi de la demande...' : `Payer ${plan === 'pro' ? '3$' : '6$'}/mois`}
+                {loading ? 'Envoi de la demande...' : `Payer ${formatPrice(plan, currency)}/mois`}
               </button>
 
-              {hasActivePlan && (
-                <button
-                  onClick={() => navigate('/')}
-                  className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm mb-3"
-                >
-                  ← Retour au dashboard
-                </button>
-              )}
-
               <button
-                onClick={handleLogout}
-                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+                onClick={() => navigate('/')}
+                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm"
               >
-                Se déconnecter
+                ← Retour au dashboard
               </button>
             </>
           )}
@@ -285,16 +314,17 @@ export default function Expired() {
               <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-[#64748B] mb-1">Plan sélectionné</p>
                 <p className="text-sm font-bold text-[#0F172A]">
-                  {plan === 'pro' ? 'Pro — 3$/mois' : 'Business — 6$/mois'}
+                  {plan === 'pro' ? 'Pro' : 'Business'} — {formatPrice(plan, currency)}/mois
+                </p>
+                <p className="text-xs text-[#64748B] mt-1">
+                  Devise : {currency === 'USD' ? 'Dollar américain ($)' : 'Franc congolais (FC)'}
                 </p>
               </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                   <p className="text-xs text-[#DC2626] font-medium">{error}</p>
-                  <p className="text-xs text-[#64748B] mt-1">
-                    Tu peux réessayer ou changer de numéro.
-                  </p>
+                  <p className="text-xs text-[#64748B] mt-1">Tu peux réessayer ou changer de numéro.</p>
                 </div>
               )}
 
@@ -313,20 +343,11 @@ export default function Expired() {
                 Réessayer avec un autre numéro
               </button>
 
-              {hasActivePlan && (
-                <button
-                  onClick={() => navigate('/')}
-                  className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm mb-2"
-                >
-                  ← Retour au dashboard
-                </button>
-              )}
-
               <button
-                onClick={handleLogout}
-                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+                onClick={() => navigate('/')}
+                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm"
               >
-                Se déconnecter
+                ← Retour au dashboard
               </button>
             </>
           )}
