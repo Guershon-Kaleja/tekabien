@@ -14,6 +14,7 @@ export default function Expired() {
   const [hasActivePlan, setHasActivePlan] = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
   const [previousExpiry, setPreviousExpiry] = useState(null)
+  const [retryDisabled, setRetryDisabled] = useState(false)
 
   const prices = {
     pro: { USD: 0.1, CDF: 280 },
@@ -48,10 +49,32 @@ export default function Expired() {
   useEffect(() => {
     if (step !== 'verify') return
 
+    let attempts = 0
+    const maxAttempts = 20 // 1 minute max (20 × 3s)
+
     const interval = setInterval(async () => {
+      attempts++
+
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
+      // Vérifier si le paiement a échoué
+      const { data: payment } = await supabase
+        .from('payments')
+        .select('status')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (payment?.status === 'failed') {
+        clearInterval(interval)
+        setError('Paiement échoué — mauvais PIN ou solde insuffisant. Réessaie.')
+        setStep('choice')
+        return
+      }
+
+      // Vérifier si le plan a été activé
       const { data } = await supabase
         .from('users')
         .select('plan, plan_expires')
@@ -62,12 +85,19 @@ export default function Expired() {
         const expires = new Date(data.plan_expires)
         const previous = previousExpiry ? new Date(previousExpiry) : new Date()
 
-        // Activer seulement si la date d'expiration a changé
         if (expires > new Date() && expires > previous) {
           clearInterval(interval)
           setStep('success')
           setTimeout(() => navigate('/'), 2000)
+          return
         }
+      }
+
+      // Timeout après 1 minute
+      if (attempts >= maxAttempts) {
+        clearInterval(interval)
+        setError('Délai dépassé — si tu as payé, contacte le support.')
+        setStep('choice')
       }
     }, 3000)
 
@@ -107,6 +137,8 @@ export default function Expired() {
 
     if (result.success) {
       setStep('verify')
+      setRetryDisabled(true)
+      setTimeout(() => setRetryDisabled(false), 10000)
     } else {
       setError(result.error || 'Erreur lors du paiement — réessaie')
     }
@@ -324,9 +356,10 @@ export default function Expired() {
 
               <button
                 onClick={() => { setStep('choice'); setError('') }}
-                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2"
+                disabled={retryDisabled}
+                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2 disabled:opacity-50"
               >
-                Réessayer avec un autre numéro
+                {retryDisabled ? 'Attends quelques secondes...' : 'Réessayer avec un autre numéro'}
               </button>
 
               <button
