@@ -269,12 +269,6 @@ export default function Dashboard() {
         >
           📦 Voir les stocks
         </button>
-        <button
-          onClick={() => navigate('/rapports')}
-          className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-4"
-        >
-          📊 Voir les rapports
-        </button>
 
         {lowStock.length > 0 && (
           <>
