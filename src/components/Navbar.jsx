@@ -5,7 +5,7 @@ const items = [
   { icon: '🛒', label: 'Ventes', path: '/ventes' },
   { icon: '📦', label: 'Stocks', path: '/stocks' },
   { icon: '👥', label: 'Clients', path: '/clients' },
-  { icon: '📊', label: 'Rapports', path: '/rapports' },
+  { icon: '👤', label: 'Profil', path: '/profil' },
 ]
 
 export default function Navbar() {

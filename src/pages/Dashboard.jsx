@@ -179,10 +179,11 @@ export default function Dashboard() {
           </div>
           <button
             onClick={() => navigate('/profil')}
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg"
             style={{ background: 'rgba(255,255,255,0.15)' }}
           >
-            <span className="text-white">👤</span>
+            <span className="text-white text-sm">👤</span>
+            <span className="text-white text-xs font-medium">Profil</span>
           </button>
         </div>
         <div className="rounded-xl p-3 border" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }}>
@@ -264,9 +265,15 @@ export default function Dashboard() {
         </button>
         <button
           onClick={() => navigate('/stocks')}
-          className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-4"
+          className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-2"
         >
           📦 Voir les stocks
+        </button>
+        <button
+          onClick={() => navigate('/rapports')}
+          className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-4"
+        >
+          📊 Voir les rapports
         </button>
 
         {lowStock.length > 0 && (
