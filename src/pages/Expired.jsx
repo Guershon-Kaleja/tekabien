@@ -13,6 +13,7 @@ export default function Expired() {
   const [error, setError] = useState('')
   const [hasActivePlan, setHasActivePlan] = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
+  const [previousExpiry, setPreviousExpiry] = useState(null)
 
   const prices = {
     pro: { USD: 0.1, CDF: 280 },
@@ -32,6 +33,7 @@ export default function Expired() {
 
       if (data) {
         setCurrentPlan(data.plan)
+        setPreviousExpiry(data.plan_expires)
         if (data.plan === 'pro' || data.plan === 'business') {
           const expires = new Date(data.plan_expires)
           const grace = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
@@ -58,7 +60,10 @@ export default function Expired() {
 
       if (data?.plan === 'pro' || data?.plan === 'business') {
         const expires = new Date(data.plan_expires)
-        if (expires > new Date()) {
+        const previous = previousExpiry ? new Date(previousExpiry) : new Date()
+
+        // Activer seulement si la date d'expiration a changé
+        if (expires > new Date() && expires > previous) {
           clearInterval(interval)
           setStep('success')
           setTimeout(() => navigate('/'), 2000)
@@ -67,7 +72,7 @@ export default function Expired() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [step])
+  }, [step, previousExpiry])
 
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
