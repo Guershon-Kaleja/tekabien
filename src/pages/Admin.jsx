@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, supabaseAdmin } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 import { logAction } from '../lib/audit'
 
+const FUNCTION_URL = `https://qoeextvpjhgqjrnzwkcj.supabase.co/functions/v1/get-users`
 
 export default function Admin() {
   const navigate = useNavigate()
@@ -41,30 +42,42 @@ export default function Admin() {
   }
 
   const fetchAdminData = async () => {
-   const { data: usersData, error } = await supabaseAdmin
-    .from('users')
-    .select('*')
-    .neq('role', 'admin')
-    .order('created_at', { ascending: false })
+    setLoading(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
 
-    console.log('Users:', usersData, 'Error:', error)
-
-    if (usersData) {
-      setUsers(usersData)
-      setStats({
-        totalUsers: usersData.length,
-        activeTrials: usersData.filter(u => u.plan === 'trial').length,
-        paidUsers: usersData.filter(u => u.plan === 'pro' || u.plan === 'business').length,
-        revenue: usersData.filter(u => u.plan === 'pro').length * 3 +
-                 usersData.filter(u => u.plan === 'business').length * 6,
+      const response = await fetch(FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
       })
+
+      const data = await response.json()
+      console.log('Admin data:', data)
+
+      if (data.users) {
+        setUsers(data.users)
+        setStats({
+          totalUsers: data.users.length,
+          activeTrials: data.users.filter(u => u.plan === 'trial').length,
+          paidUsers: data.users.filter(u => u.plan === 'pro' || u.plan === 'business').length,
+          revenue: data.users.filter(u => u.plan === 'pro').length * 3 +
+                   data.users.filter(u => u.plan === 'business').length * 6,
+        })
+      }
+    } catch (err) {
+      console.error('Erreur fetchAdminData:', err)
     }
     setLoading(false)
   }
 
   const handleActivatePlan = async (userId, plan) => {
     const expires = new Date()
-    expires.setMonth(expires.getMonth() + 1)
+    expires.setDate(expires.getDate() + 30)
 
     await supabase
       .from('users')
