@@ -113,6 +113,48 @@ export default function Dashboard() {
     orange: 'Orange Money', mpesa: 'M-Pesa', credit: 'Crédit'
   })[method] || method
 
+  const getPlanBannerBg = () => {
+    if (userPlan === 'trial' && trialDaysLeft <= 5) return 'bg-[#FEF2F2]'
+    if (userPlan === 'trial') return 'bg-[#FFFBEB]'
+    if (userPlan === 'pro' || userPlan === 'business') return 'bg-[#F0FDF4]'
+    if (userPlan === 'free') return 'bg-[#F8FAFC]'
+    return 'bg-[#FEF2F2]'
+  }
+
+  const getPlanTextColor = () => {
+    if (userPlan === 'pro' || userPlan === 'business') return 'text-[#16A34A]'
+    if (userPlan === 'trial' && trialDaysLeft <= 5) return 'text-[#DC2626]'
+    if (userPlan === 'trial') return 'text-[#B45309]'
+    if (userPlan === 'free') return 'text-[#64748B]'
+    return 'text-[#64748B]'
+  }
+
+  const getPlanIcon = () => {
+    if (userPlan === 'pro' || userPlan === 'business') return '✅'
+    if (userPlan === 'trial' && trialDaysLeft <= 5) return '⚠️'
+    if (userPlan === 'trial') return '🎁'
+    if (userPlan === 'free') return '🔒'
+    return '🔒'
+  }
+
+  const getPlanLabel = () => {
+    if (userPlan === 'pro') return 'Plan Pro actif'
+    if (userPlan === 'business') return 'Plan Business actif'
+    if (userPlan === 'trial' && trialDaysLeft === 0) return "Ton essai expire aujourd'hui !"
+    if (userPlan === 'trial' && trialDaysLeft > 0) return `Il te reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai`
+    if (userPlan === 'free') return 'Plan gratuit — fonctionnalités limitées'
+    return ''
+  }
+
+  const getPlanSub = () => {
+    if ((userPlan === 'pro' || userPlan === 'business') && planExpires) {
+      return `Renouvellement le ${new Date(planExpires).toLocaleDateString('fr-FR')}`
+    }
+    if (userPlan === 'trial') return 'Passe au Pro pour continuer sans interruption'
+    if (userPlan === 'free') return '20 ventes/j · 5 produits · 3 clients max'
+    return ''
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
@@ -150,39 +192,21 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Bandeau plan */}
       {userPlan && userPlan !== 'admin' && (
-        <div className={`px-4 py-3 flex items-center justify-between ${
-          userPlan === 'trial' && trialDaysLeft <= 5 ? 'bg-[#FEF2F2]' :
-          userPlan === 'trial' ? 'bg-[#FFFBEB]' :
-          userPlan === 'pro' || userPlan === 'business' ? 'bg-[#F0FDF4]' :
-          'bg-[#FEF2F2]'
-        }`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${getPlanBannerBg()}`}>
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {userPlan === 'pro' || userPlan === 'business' ? '✅' :
-               userPlan === 'trial' && trialDaysLeft <= 5 ? '⚠️' : '🎁'}
-            </span>
+            <span className="text-lg">{getPlanIcon()}</span>
             <div>
-              <p className={`text-xs font-semibold ${
-                userPlan === 'pro' || userPlan === 'business' ? 'text-[#16A34A]' :
-                userPlan === 'trial' && trialDaysLeft <= 5 ? 'text-[#DC2626]' :
-                'text-[#B45309]'
-              }`}>
-                {userPlan === 'pro' && 'Plan Pro actif'}
-                {userPlan === 'business' && 'Plan Business actif'}
-                {userPlan === 'trial' && trialDaysLeft === 0 && "Ton essai expire aujourd'hui !"}
-                {userPlan === 'trial' && trialDaysLeft > 0 && `Il te reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai`}
+              <p className={`text-xs font-semibold ${getPlanTextColor()}`}>
+                {getPlanLabel()}
               </p>
               <p className="text-xs text-[#64748B]">
-                {(userPlan === 'pro' || userPlan === 'business') && planExpires
-                  ? `Renouvellement le ${new Date(planExpires).toLocaleDateString('fr-FR')}`
-                  : userPlan === 'trial'
-                  ? 'Passe au Pro pour continuer sans interruption'
-                  : ''
-                }
+                {getPlanSub()}
               </p>
             </div>
           </div>
+
           {userPlan === 'trial' && (
             <button
               onClick={() => navigate('/expired')}
@@ -195,6 +219,16 @@ export default function Dashboard() {
               Passer au Pro
             </button>
           )}
+
+          {userPlan === 'free' && (
+            <button
+              onClick={() => navigate('/expired')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap bg-[#1A56DB] text-white"
+            >
+              Passer au Pro
+            </button>
+          )}
+
           {(userPlan === 'pro' || userPlan === 'business') && (
             <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
               userPlan === 'pro' ? 'bg-[#16A34A] text-white' : 'bg-[#1A56DB] text-white'
