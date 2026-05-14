@@ -7,22 +7,28 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  console.log('=== CALLBACK RECU ===')
+  console.log('Method:', req.method)
+  console.log('URL:', req.url)
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
-  // Répondre IMMÉDIATEMENT avec 200 comme demandé par Labyrinthe
-  const responsePromise = new Response(JSON.stringify({ received: true }), {
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    status: 200,
-  })
-
   try {
-    const body = await req.json()
-    console.log('=== Callback Labyrinthe reçu ===')
-    console.log('Body complet:', JSON.stringify(body))
+    const rawBody = await req.text()
+    console.log('Raw body:', rawBody)
+    console.log('Body length:', rawBody.length)
 
-    const statusCode = body?.results?.status?.code
+    let body = {}
+    try {
+      body = JSON.parse(rawBody)
+      console.log('Parsed body:', JSON.stringify(body))
+    } catch (e) {
+      console.log('Parse error:', String(e))
+    }
+
+    const statusCode = parseInt(body?.results?.status?.code)
     const orderNumber = body?.orderNumber
     const reference = body?.reference
 
@@ -35,11 +41,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     )
 
-    // Chercher le paiement par orderNumber OU reference
     const identifier = orderNumber || reference
     if (!identifier) {
-      console.log('Pas de référence trouvée dans le callback')
-      return responsePromise
+      console.log('Pas de référence trouvée')
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
     }
 
     const { data: payment, error: paymentError } = await supabase
@@ -51,19 +59,12 @@ serve(async (req) => {
     console.log('Payment trouvé:', JSON.stringify(payment))
     console.log('Payment error:', JSON.stringify(paymentError))
 
-    if (!payment) {
-      console.log('Aucun paiement trouvé pour:', identifier)
-      return responsePromise
-    }
-
-    if (statusCode === 2) {
-      // Paiement réussi
+    if (payment && statusCode === 2) {
       await supabase
         .from('payments')
         .update({ status: 'completed', order_number: orderNumber })
         .eq('id', payment.id)
 
-      // Calculer la nouvelle date d'expiration
       const { data: currentUser } = await supabase
         .from('users')
         .select('plan_expires')
@@ -87,19 +88,27 @@ serve(async (req) => {
 
       console.log('✅ Plan activé pour user:', payment.user_id, 'plan:', payment.plan)
 
-    } else if (statusCode === 3) {
-      // Paiement échoué
+    } else if (payment && statusCode === 3) {
       await supabase
         .from('payments')
         .update({ status: 'failed' })
         .eq('id', payment.id)
 
-      console.log('❌ Paiement échoué pour:', identifier)
+      console.log('❌ Paiement échoué')
+    } else {
+      console.log('Condition non remplie — payment:', !!payment, 'statusCode:', statusCode)
     }
+
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
 
   } catch (error) {
     console.log('Erreur callback:', String(error))
+    return new Response(JSON.stringify({ received: true }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   }
-
-  return responsePromise
 })

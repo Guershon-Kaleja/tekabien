@@ -42,13 +42,15 @@ serve(async (req) => {
       })
 
       const data = await response.json()
-      console.log('Réponse Labyrinthe:', JSON.stringify(data))
 
-      // Utiliser orderNumber de Labyrinthe comme référence
+      console.log('Réponse Labyrinthe RAW:', JSON.stringify(data))
+      console.log('data.orderNumber:', data.orderNumber)
+      console.log('data.reference:', data.reference)
+
       if (data?.success) {
         return new Response(JSON.stringify({
           success: true,
-          reference: data.orderNumber,  // on utilise orderNumber de Labyrinthe
+          reference: data.orderNumber,
           orderNumber: data.orderNumber,
           message: data.message,
         }), {
