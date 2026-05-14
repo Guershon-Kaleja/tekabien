@@ -15,6 +15,7 @@ export default function Expired() {
   const [currentPlan, setCurrentPlan] = useState(null)
   const [previousExpiry, setPreviousExpiry] = useState(null)
   const [retryDisabled, setRetryDisabled] = useState(false)
+  const [currentReference, setCurrentReference] = useState(null)
 
   const prices = {
     pro: { USD: 0.1, CDF: 280 },
@@ -47,10 +48,10 @@ export default function Expired() {
 
   // Polling automatique quand on est à l'étape verify
   useEffect(() => {
-    if (step !== 'verify') return
+    if (step !== 'verify' || !currentReference) return
 
     let attempts = 0
-    const maxAttempts = 20 // 1 minute max (20 × 3s)
+    const maxAttempts = 20 // 1 minute max
 
     const interval = setInterval(async () => {
       attempts++
@@ -58,14 +59,14 @@ export default function Expired() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Vérifier si le paiement a échoué
+      // Vérifier le statut du paiement en cours
       const { data: payment } = await supabase
         .from('payments')
         .select('status')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('reference', currentReference)
         .single()
+
+      console.log('Polling payment status:', payment?.status)
 
       if (payment?.status === 'failed') {
         clearInterval(interval)
@@ -74,22 +75,24 @@ export default function Expired() {
         return
       }
 
-      // Vérifier si le plan a été activé
-      const { data } = await supabase
-        .from('users')
-        .select('plan, plan_expires')
-        .eq('id', session.user.id)
-        .single()
+      if (payment?.status === 'completed') {
+        // Vérifier que le plan a été mis à jour
+        const { data } = await supabase
+          .from('users')
+          .select('plan, plan_expires')
+          .eq('id', session.user.id)
+          .single()
 
-      if (data?.plan === 'pro' || data?.plan === 'business') {
-        const expires = new Date(data.plan_expires)
-        const previous = previousExpiry ? new Date(previousExpiry) : new Date()
+        if (data?.plan === 'pro' || data?.plan === 'business') {
+          const expires = new Date(data.plan_expires)
+          const previous = previousExpiry ? new Date(previousExpiry) : new Date()
 
-        if (expires > new Date() && expires > previous) {
-          clearInterval(interval)
-          setStep('success')
-          setTimeout(() => navigate('/'), 2000)
-          return
+          if (expires > new Date() && expires > previous) {
+            clearInterval(interval)
+            setStep('success')
+            setTimeout(() => navigate('/'), 2000)
+            return
+          }
         }
       }
 
@@ -102,7 +105,7 @@ export default function Expired() {
     }, 3000)
 
     return () => clearInterval(interval)
-  }, [step, previousExpiry])
+  }, [step, currentReference, previousExpiry])
 
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
@@ -136,6 +139,7 @@ export default function Expired() {
     })
 
     if (result.success) {
+      setCurrentReference(result.reference)
       setStep('verify')
       setRetryDisabled(true)
       setTimeout(() => setRetryDisabled(false), 10000)
@@ -355,7 +359,7 @@ export default function Expired() {
               )}
 
               <button
-                onClick={() => { setStep('choice'); setError('') }}
+                onClick={() => { setStep('choice'); setError(''); setCurrentReference(null) }}
                 disabled={retryDisabled}
                 className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2 disabled:opacity-50"
               >
