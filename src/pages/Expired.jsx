@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { initiatePayment, checkPaymentStatus } from '../lib/labyrinthe'
+import { initiatePayment } from '../lib/labyrinthe'
 
 export default function Expired() {
   const navigate = useNavigate()
@@ -11,8 +11,6 @@ export default function Expired() {
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [orderNumber, setOrderNumber] = useState('')
-  const [checking, setChecking] = useState(false)
   const [hasActivePlan, setHasActivePlan] = useState(false)
   const [currentPlan, setCurrentPlan] = useState(null)
 
@@ -43,6 +41,33 @@ export default function Expired() {
     }
     checkPlan()
   }, [])
+
+  // Polling automatique quand on est à l'étape verify
+  useEffect(() => {
+    if (step !== 'verify') return
+
+    const interval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const { data } = await supabase
+        .from('users')
+        .select('plan, plan_expires')
+        .eq('id', session.user.id)
+        .single()
+
+      if (data?.plan === 'pro' || data?.plan === 'business') {
+        const expires = new Date(data.plan_expires)
+        if (expires > new Date()) {
+          clearInterval(interval)
+          setStep('success')
+          setTimeout(() => navigate('/'), 2000)
+        }
+      }
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [step])
 
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
@@ -75,69 +100,12 @@ export default function Expired() {
     })
 
     if (result.success) {
-      setOrderNumber(result.reference)
       setStep('verify')
     } else {
       setError(result.error || 'Erreur lors du paiement — réessaie')
     }
 
     setLoading(false)
-  }
-
-  const handleVerifyPayment = async () => {
-    if (!orderNumber) {
-      setError('Référence de paiement manquante')
-      return
-    }
-    setError('')
-    setChecking(true)
-
-    let attempts = 0
-    const maxAttempts = 10
-
-    const check = async () => {
-      attempts++
-      const result = await checkPaymentStatus(orderNumber)
-
-      if (result.paid) {
-        const { data: { session } } = await supabase.auth.getSession()
-        const user = session?.user
-        if (!user) return
-
-        const { data: currentUser } = await supabase
-          .from('users')
-          .select('plan_expires')
-          .eq('id', user.id)
-          .single()
-
-        const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
-          ? new Date(currentUser.plan_expires)
-          : new Date()
-
-        const expires = new Date(baseDate)
-        expires.setMonth(expires.getMonth() + 1)
-
-        await supabase
-          .from('users')
-          .update({ plan, plan_expires: expires.toISOString() })
-          .eq('id', user.id)
-
-        setChecking(false)
-        setStep('success')
-        setTimeout(() => navigate('/'), 2000)
-      } else if (result.failed) {
-        setChecking(false)
-        setError('Paiement échoué — solde insuffisant ou annulé. Réessaie avec un autre numéro.')
-        setStep('choice')
-      } else if (attempts < maxAttempts) {
-        setTimeout(check, 3000)
-      } else {
-        setChecking(false)
-        setError('Délai dépassé — si tu as payé, clique à nouveau sur "J\'ai confirmé".')
-      }
-    }
-
-    await check()
   }
 
   const formatPrice = (p, c) => {
@@ -332,41 +300,32 @@ export default function Expired() {
                 </p>
               </div>
 
-              {checking && (
-                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-3 mb-4">
-                  <p className="text-xs text-[#1A56DB] font-medium text-center">
-                    🔄 Vérification en cours... Attends quelques secondes.
-                  </p>
+              <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 border-2 border-[#1A56DB] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                  <div>
+                    <p className="text-xs text-[#1A56DB] font-semibold">Activation automatique en cours</p>
+                    <p className="text-xs text-[#64748B] mt-0.5">Dès que tu confirmes le PIN, ton plan sera activé automatiquement</p>
+                  </div>
                 </div>
-              )}
+              </div>
 
               {error && (
                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                   <p className="text-xs text-[#DC2626] font-medium">{error}</p>
-                  <p className="text-xs text-[#64748B] mt-1">Tu peux réessayer ou changer de numéro.</p>
                 </div>
               )}
 
               <button
-                onClick={handleVerifyPayment}
-                disabled={checking}
-                className="w-full bg-[#16A34A] text-white rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
-              >
-                {checking ? 'Vérification automatique...' : "J'ai confirmé le paiement ✓"}
-              </button>
-
-              <button
-                onClick={() => { setStep('choice'); setError(''); setOrderNumber('') }}
-                disabled={checking}
-                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2 disabled:opacity-50"
+                onClick={() => { setStep('choice'); setError('') }}
+                className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm mb-2"
               >
                 Réessayer avec un autre numéro
               </button>
 
               <button
                 onClick={() => navigate('/')}
-                disabled={checking}
-                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
+                className="w-full bg-[#EBF2FF] text-[#1A56DB] rounded-xl py-3 font-medium text-sm"
               >
                 ← Retour au dashboard
               </button>
