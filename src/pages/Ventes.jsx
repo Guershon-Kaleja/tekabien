@@ -341,6 +341,57 @@ export default function Ventes() {
   const getInitials = (name) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 
+  const [showCancelConfirm, setShowCancelConfirm] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
+
+  const handleCancelSale = async (sale) => {
+    setCancelling(true)
+    try {
+      const { error } = await supabase
+        .from('sales')
+        .delete()
+        .eq('id', sale.id)
+
+      if (!error) {
+        if (sale.product_id) {
+          const { data: product } = await supabase
+            .from('products')
+            .select('quantity')
+            .eq('id', sale.product_id)
+            .single()
+
+          if (product) {
+            await supabase
+              .from('products')
+              .update({ quantity: product.quantity + sale.quantity })
+              .eq('id', sale.product_id)
+          }
+        }
+
+        if (sale.payment_method === 'credit' && sale.customer_id) {
+          const { data: customer } = await supabase
+            .from('customers')
+            .select('total_debt')
+            .eq('id', sale.customer_id)
+            .single()
+
+          if (customer) {
+            await supabase
+              .from('customers')
+              .update({ total_debt: Math.max(0, customer.total_debt - sale.total) })
+              .eq('id', sale.customer_id)
+          }
+        }
+
+        setShowCancelConfirm(null)
+        fetchAllSales()
+      }
+    } catch (err) {
+      console.error('Erreur annulation:', err)
+    }
+    setCancelling(false)
+  }
+
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-8">
 
@@ -709,27 +760,77 @@ export default function Ventes() {
             </div>
           ) : (
             filteredHistory.map((sale) => (
-              <div key={sale.id} className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3 mb-2">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: paymentColor(sale.payment_method) + '20' }}
-                >
-                  <span className="text-sm">🛒</span>
+              <div key={sale.id} className="bg-white rounded-xl border border-gray-200 p-3 mb-2">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: paymentColor(sale.payment_method) + '20' }}
+                  >
+                    <span className="text-sm">🛒</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-[#0F172A]">{sale.product_name}</p>
+                    <p className="text-xs text-[#64748B]">
+                      {formatDateTime(sale.created_at)} · {paymentLabel(sale.payment_method)}
+                    </p>
+                    {sale.customer_name && (
+                      <p className="text-xs text-[#F5A623] font-medium">👤 {sale.customer_name}</p>
+                    )}
+                    <p className="text-xs text-[#64748B]">Qté : {sale.quantity}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-2">
+                    <span className="text-sm font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
+                    <button
+                      onClick={() => setShowCancelConfirm(sale)}
+                      className="text-xs text-[#DC2626] bg-[#FEF2F2] px-2 py-1 rounded-lg font-medium"
+                    >
+                      🗑️ Annuler
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-xs font-semibold text-[#0F172A]">{sale.product_name}</p>
-                  <p className="text-xs text-[#64748B]">
-                    {formatDateTime(sale.created_at)} · {paymentLabel(sale.payment_method)}
-                  </p>
-                  {sale.customer_name && (
-                    <p className="text-xs text-[#F5A623] font-medium">👤 {sale.customer_name}</p>
-                  )}
-                  <p className="text-xs text-[#64748B]">Qté : {sale.quantity}</p>
-                </div>
-                <span className="text-sm font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
               </div>
             ))
           )}
+
+          {/* Modal confirmation annulation */}
+          {showCancelConfirm && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+              <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+                <div className="text-center mb-4">
+                  <p className="text-3xl mb-3">🗑️</p>
+                  <h2 className="text-base font-bold text-[#0F172A]">Annuler cette vente ?</h2>
+                  <p className="text-sm text-[#64748B] mt-1">
+                    <span className="font-semibold text-[#0F172A]">{showCancelConfirm.product_name}</span> — {formatFC(showCancelConfirm.total)}
+                  </p>
+                  <p className="text-xs text-[#64748B] mt-2">
+                    Le stock sera restitué automatiquement.
+                  </p>
+                  {showCancelConfirm.payment_method === 'credit' && showCancelConfirm.customer_name && (
+                    <p className="text-xs text-[#F5A623] mt-1">
+                      La dette de {showCancelConfirm.customer_name} sera aussi réduite.
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowCancelConfirm(null)}
+                    disabled={cancelling}
+                    className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
+                  >
+                    Garder
+                  </button>
+                  <button
+                    onClick={() => handleCancelSale(showCancelConfirm)}
+                    disabled={cancelling}
+                    className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+                  >
+                    {cancelling ? 'Annulation...' : 'Annuler la vente'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
