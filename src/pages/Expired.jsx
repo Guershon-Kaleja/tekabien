@@ -71,9 +71,10 @@ export default function Expired() {
 
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-    if (/^0(99|97|98)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444', icon: '📱' }
-    if (/^0(84|85|89)/.test(clean)) return { name: 'Orange Money', color: '#F97316', icon: '📱' }
-    if (/^0(81|82|83)/.test(clean)) return { name: 'M-Pesa', color: '#8B5CF6', icon: '📱' }
+    if (/^0(97|98|99)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444', icon: '📱' }
+    if (/^0(80|84|85|89)/.test(clean)) return { name: 'Orange Money', color: '#F97316', icon: '📱' }
+    if (/^0(81|82|83)/.test(clean)) return { name: 'M-Pesa (Vodacom)', color: '#8B5CF6', icon: '📱' }
+    if (/^0(90|91)/.test(clean)) return { name: 'Africell', color: '#16A34A', icon: '📱' }
     return null
   }
 
@@ -258,7 +259,7 @@ export default function Expired() {
                   }
                   return (
                     <p className="text-xs text-[#64748B] mt-1">
-                      Airtel Money, Orange Money ou M-Pesa
+                      Airtel, Orange, M-Pesa ou Africell
                     </p>
                   )
                 })()}

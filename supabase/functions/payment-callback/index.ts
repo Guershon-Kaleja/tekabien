@@ -18,7 +18,6 @@ serve(async (req) => {
   try {
     const rawBody = await req.text()
     console.log('Raw body:', rawBody)
-    console.log('Body length:', rawBody.length)
 
     let body = {}
     try {
@@ -59,7 +58,9 @@ serve(async (req) => {
     console.log('Payment trouvé:', JSON.stringify(payment))
     console.log('Payment error:', JSON.stringify(paymentError))
 
-    if (payment && statusCode === 2) {
+    if (payment && payment.status === 'pending' && statusCode === 2) {
+
+      // Marquer comme completed IMMÉDIATEMENT pour éviter double activation
       await supabase
         .from('payments')
         .update({ status: 'completed', order_number: orderNumber })
@@ -67,16 +68,17 @@ serve(async (req) => {
 
       const { data: currentUser } = await supabase
         .from('users')
-        .select('plan_expires')
+        .select('plan, plan_expires')
         .eq('id', payment.user_id)
         .single()
 
-      const baseDate = currentUser?.plan_expires && new Date(currentUser.plan_expires) > new Date()
-        ? new Date(currentUser.plan_expires)
-        : new Date()
+      // Calculer la date d'expiration — 30 jours fixes
+      const now = new Date()
+      const currentExpires = currentUser?.plan_expires ? new Date(currentUser.plan_expires) : null
+      const baseDate = currentExpires && currentExpires > now ? currentExpires : now
 
       const expires = new Date(baseDate)
-      expires.setMonth(expires.getMonth() + 1)
+      expires.setDate(expires.getDate() + 30)
 
       await supabase
         .from('users')
@@ -86,9 +88,9 @@ serve(async (req) => {
         })
         .eq('id', payment.user_id)
 
-      console.log('✅ Plan activé pour user:', payment.user_id, 'plan:', payment.plan)
+      console.log('✅ Plan activé pour user:', payment.user_id, 'plan:', payment.plan, 'expires:', expires.toISOString())
 
-    } else if (payment && statusCode === 3) {
+    } else if (payment && payment.status === 'pending' && statusCode === 3) {
       await supabase
         .from('payments')
         .update({ status: 'failed' })
@@ -96,7 +98,7 @@ serve(async (req) => {
 
       console.log('❌ Paiement échoué')
     } else {
-      console.log('Condition non remplie — payment:', !!payment, 'statusCode:', statusCode)
+      console.log('Ignoré — payment status:', payment?.status, 'statusCode:', statusCode)
     }
 
     return new Response(JSON.stringify({ received: true }), {
