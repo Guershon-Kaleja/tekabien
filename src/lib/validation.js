@@ -27,14 +27,18 @@ export const validateClient = (form) => {
 
   if (form.phone) {
     const clean = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-    
-    // Doit être exactement 10 chiffres
-    if (!/^\d{10}$/.test(clean)) {
+
+    // 9 chiffres sans 0 au début → on peut ajouter 0
+    const normalized = (clean.length === 9 && !clean.startsWith('0'))
+      ? '0' + clean
+      : clean
+
+    if (!/^\d+$/.test(clean)) {
+      errors.phone = 'Le numéro ne doit contenir que des chiffres'
+    } else if (normalized.length !== 10) {
       errors.phone = 'Le numéro doit avoir 10 chiffres (ex: 0891234567)'
-    }
-    // Doit commencer par 08 ou 09 ou 07
-    else if (!/^0(7|8|9)\d{8}$/.test(clean)) {
-      errors.phone = 'Numéro invalide — doit commencer par 08x, 09x ou 07x'
+    } else if (!/^0(7|8|9)\d{8}$/.test(normalized)) {
+      errors.phone = 'Numéro invalide — doit commencer par 07x, 08x ou 09x'
     }
   }
 

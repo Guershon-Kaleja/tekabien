@@ -45,6 +45,14 @@ export default function Clients() {
     setLoading(false)
   }
 
+  const normalizePhone = (phone) => {
+    const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+    if (clean.length === 9 && !clean.startsWith('0')) {
+      return '0' + clean
+    }
+    return clean
+  }
+
   const handleAddClient = async () => {
     if (!canAddClient(userPlan, clients.length)) {
       setFormErrors({
@@ -53,7 +61,12 @@ export default function Clients() {
       return
     }
 
-    const errors = validateClient(form)
+    const normalizedForm = {
+      ...form,
+      phone: form.phone ? normalizePhone(form.phone) : ''
+    }
+
+    const errors = validateClient(normalizedForm)
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors)
       return
@@ -62,8 +75,8 @@ export default function Clients() {
 
     const { error } = await supabase.from('customers').insert({
       user_id: userId,
-      name: sanitize(form.name),
-      phone: sanitize(form.phone),
+      name: sanitize(normalizedForm.name),
+      phone: sanitize(normalizedForm.phone),
       total_debt: 0,
     })
     if (!error) {
@@ -305,7 +318,7 @@ export default function Clients() {
                     setForm({ ...form, phone: e.target.value })
                     if (formErrors.phone) setFormErrors({ ...formErrors, phone: null })
                   }}
-                  placeholder="+243 8X XXX XXXX"
+                  placeholder="Ex: 0891234567 ou 891234567"
                   className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${
                     formErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'
                   }`}
