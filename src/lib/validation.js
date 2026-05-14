@@ -25,8 +25,18 @@ export const validateClient = (form) => {
   if (!form.name || form.name.trim().length < 2)
     errors.name = 'Le nom doit avoir au moins 2 caractères'
 
-  if (form.phone && !/^[+\d\s]{8,15}$/.test(form.phone))
-    errors.phone = 'Numéro de téléphone invalide'
+  if (form.phone) {
+    const clean = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+    
+    // Doit être exactement 10 chiffres
+    if (!/^\d{10}$/.test(clean)) {
+      errors.phone = 'Le numéro doit avoir 10 chiffres (ex: 0891234567)'
+    }
+    // Doit commencer par 08 ou 09 ou 07
+    else if (!/^0(7|8|9)\d{8}$/.test(clean)) {
+      errors.phone = 'Numéro invalide — doit commencer par 08x, 09x ou 07x'
+    }
+  }
 
   return errors
 }
