@@ -46,7 +46,7 @@ export default function Rapports() {
     } else if (period === 'custom') {
       return {
         start: customStart ? new Date(customStart).toISOString() : new Date().toISOString(),
-        end: customEnd ? new Date(customEnd + 'T23:59:59').toISOString() : new Date().toISOString(),
+        end: customEnd ? new Date(customEnd + 'T23:59:59').toISOString() : new Date(customStart + 'T23:59:59').toISOString(),
       }
     }
 
@@ -137,8 +137,8 @@ export default function Rapports() {
   const handleCustomSearch = () => {
     if (!customStart) return
     if (!customEnd) setCustomEnd(customStart)
-    fetchStats()
     setShowCustom(false)
+    fetchStats()
   }
 
   const formatFC = (amount) =>
@@ -209,7 +209,7 @@ export default function Rapports() {
       <div className="px-4 pt-4">
 
         {/* Filtres période */}
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        <div className="flex gap-2 mb-4">
           {[
             { id: 'today', label: "Auj." },
             { id: 'week', label: '7 jours' },
@@ -226,7 +226,7 @@ export default function Rapports() {
                   setShowCustom(false)
                 }
               }}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
+              className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
                 period === p.id
                   ? 'bg-[#1A56DB] text-white border-[#1A56DB]'
                   : 'bg-white text-[#64748B] border-gray-200'
@@ -236,53 +236,6 @@ export default function Rapports() {
             </button>
           ))}
         </div>
-
-        {/* Sélecteur date personnalisée */}
-        {showCustom && (
-          <div className="bg-white rounded-xl border border-[#1A56DB] p-4 mb-4">
-            <p className="text-xs font-semibold text-[#1A56DB] uppercase tracking-wide mb-4">
-              📅 Choisir une période
-            </p>
-            <div className="space-y-3 mb-4">
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Du
-                </label>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Au
-                </label>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCustomSearch}
-                className="flex-1 bg-[#1A56DB] text-white rounded-xl py-3 text-sm font-semibold"
-              >
-                Voir les stats
-              </button>
-              <button
-                onClick={() => { setShowCustom(false); setPeriod('today') }}
-                className="px-4 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 text-sm font-medium"
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        )}
 
         {loading ? (
           <p className="text-center text-[#64748B] text-sm py-8">Chargement...</p>
@@ -475,6 +428,54 @@ export default function Rapports() {
         )}
 
       </div>
+
+      {/* Modal sélecteur date — bottom sheet */}
+      {showCustom && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-[#0F172A]">📅 Choisir une période</h2>
+              <button
+                onClick={() => { setShowCustom(false); setPeriod('today') }}
+                className="text-[#64748B] text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-4 mb-5">
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                  Du
+                </label>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                  Au (optionnel)
+                </label>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleCustomSearch}
+              disabled={!customStart}
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+            >
+              Voir les stats
+            </button>
+          </div>
+        </div>
+      )}
 
       <Navbar />
 
