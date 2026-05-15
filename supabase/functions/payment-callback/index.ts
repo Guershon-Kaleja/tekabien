@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   try {
-    // Vérifier le secret webhook depuis l'URL
+    // Vérifier le secret webhook
     const url = new URL(req.url)
     const secret = url.searchParams.get('secret')
     const expectedSecret = Deno.env.get('WEBHOOK_SECRET')
@@ -65,17 +65,31 @@ serve(async (req) => {
       })
     }
 
-    const { data: payment, error: paymentError } = await supabase
+    // Recherche sécurisée — pas d'injection SQL possible
+    let payment = null
+
+    const { data: byRef } = await supabase
       .from('payments')
       .select('*')
-      .or(`reference.eq.${identifier},order_number.eq.${identifier}`)
-      .single()
+      .eq('reference', identifier)
+      .maybeSingle()
+
+    if (byRef) {
+      payment = byRef
+    } else {
+      const { data: byOrder } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('order_number', identifier)
+        .maybeSingle()
+      if (byOrder) payment = byOrder
+    }
 
     console.log('Payment trouvé:', JSON.stringify(payment))
-    console.log('Payment error:', JSON.stringify(paymentError))
 
     if (payment && payment.status === 'pending' && statusCode === 2) {
 
+      // Marquer comme completed IMMÉDIATEMENT pour éviter double activation
       await supabase
         .from('payments')
         .update({ status: 'completed', order_number: orderNumber })
