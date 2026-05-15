@@ -114,16 +114,27 @@ export default function Clients() {
     }
   }
 
-  const handlePaid = async (client) => {
+ const handlePaid = async (client) => {
+  // Marquer les dettes comme payées
     await supabase
       .from('customers')
       .update({ total_debt: 0 })
       .eq('id', client.id)
+
     await supabase
       .from('debts')
       .update({ status: 'paid', paid: client.total_debt })
       .eq('customer_id', client.id)
       .eq('status', 'pending')
+
+    // Comptabiliser les ventes crédit de ce client
+    await supabase
+      .from('sales')
+      .update({ encaissee: true })
+      .eq('customer_id', client.id)
+      .eq('payment_method', 'credit')
+      .eq('encaissee', false)
+
     fetchClients()
   }
 

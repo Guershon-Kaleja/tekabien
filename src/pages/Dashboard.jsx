@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [trialDaysLeft, setTrialDaysLeft] = useState(null)
   const [userPlan, setUserPlan] = useState(null)
   const [planExpires, setPlanExpires] = useState(null)
+  const [creditPending, setCreditPending] = useState(0)
 
   const today = new Date()
   const dateStr = today.toLocaleDateString('fr-FR', {
@@ -61,8 +62,13 @@ export default function Dashboard() {
       .order('created_at', { ascending: false })
 
     if (salesData) {
-      setTodaySales(salesData.reduce((sum, s) => sum + s.total, 0))
-      setSalesCount(salesData.length)
+      // Compter uniquement les ventes encaissées
+      const encaissees = salesData.filter(s => s.encaissee !== false)
+      const credits = salesData.filter(s => s.encaissee === false)
+
+      setTodaySales(encaissees.reduce((sum, s) => sum + s.total, 0))
+      setSalesCount(encaissees.length)
+      setCreditPending(credits.length)
       setLastSales(salesData.slice(0, 3))
     }
 
@@ -73,8 +79,9 @@ export default function Dashboard() {
       .gte('created_at', startOfDay.toISOString())
 
     if (salesData && expensesData) {
-      const totalSales = salesData.reduce((sum, s) => sum + s.total, 0)
-      const totalCost = salesData.reduce((sum, s) => sum + (s.cost || 0), 0)
+      const encaissees = salesData.filter(s => s.encaissee !== false)
+      const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
+      const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
       const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
       setNetProfit(totalSales - totalCost - totalExpenses)
     }
@@ -187,9 +194,16 @@ export default function Dashboard() {
           </button>
         </div>
         <div className="rounded-xl p-3 border" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }}>
-          <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Ventes du jour</p>
+          <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Ventes encaissées du jour</p>
           <p className="text-white text-3xl font-bold">{formatFC(todaySales)}</p>
-          <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>{salesCount} ventes enregistrées</p>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{salesCount} ventes encaissées</p>
+            {creditPending > 0 && (
+              <p className="text-xs bg-[#F5A623] text-white px-2 py-0.5 rounded-full font-medium">
+                {creditPending} crédit en attente
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -265,7 +279,7 @@ export default function Dashboard() {
         </button>
         <button
           onClick={() => navigate('/stocks')}
-          className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-2"
+          className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-medium text-sm flex items-center justify-center gap-2 mb-4"
         >
           📦 Voir les stocks
         </button>
@@ -319,6 +333,11 @@ export default function Dashboard() {
                   <p className="text-xs text-[#64748B]">
                     Vendu à {formatTime(sale.created_at)} · {paymentLabel(sale.payment_method)}
                   </p>
+                  {sale.encaissee === false && (
+                    <span className="text-xs bg-[#FFFBEB] text-[#B45309] px-2 py-0.5 rounded-full font-medium">
+                      ⏳ En attente
+                    </span>
+                  )}
                 </div>
                 <span className="text-xs font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
               </div>

@@ -257,6 +257,7 @@ export default function Ventes() {
       payment_method: payment,
       customer_id: payment === 'credit' ? selectedClient?.id : null,
       customer_name: payment === 'credit' ? selectedClient?.name : null,
+      encaissee: payment !== 'credit', // ← false si crédit
     }
 
     if (!isOnline()) {
@@ -476,10 +477,15 @@ export default function Ventes() {
                 </div>
                 <p className="text-lg font-bold text-[#0F172A]">Vente enregistrée !</p>
                 <p className="text-sm text-[#64748B] mt-1">{formatFC(total)}</p>
-                {payment === 'credit' && selectedClient && (
-                  <p className="text-xs text-[#F5A623] mt-2">
-                    💳 Dette ajoutée pour {selectedClient.name}
-                  </p>
+               {payment === 'credit' && selectedClient && (
+                  <div className="mt-2">
+                    <p className="text-xs text-[#F5A623]">
+                      💳 Dette ajoutée pour {selectedClient.name}
+                    </p>
+                    <p className="text-xs text-[#B45309] mt-1">
+                      ⏳ Sera comptabilisée au remboursement
+                    </p>
+                  </div>
                 )}
                 {!online && (
                   <p className="text-xs text-[#F5A623] mt-2">
@@ -777,6 +783,11 @@ export default function Ventes() {
                       <p className="text-xs text-[#F5A623] font-medium">👤 {sale.customer_name}</p>
                     )}
                     <p className="text-xs text-[#64748B]">Qté : {sale.quantity}</p>
+                    {sale.encaissee === false && (
+                      <span className="text-xs bg-[#FFFBEB] text-[#B45309] px-2 py-0.5 rounded-full font-medium mt-1 inline-block">
+                        ⏳ En attente d'encaissement
+                      </span>
+                    )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className="text-sm font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
