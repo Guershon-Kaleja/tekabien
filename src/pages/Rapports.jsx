@@ -432,44 +432,43 @@ export default function Rapports() {
       {/* Modal sélecteur date — bottom sheet */}
       {showCustom && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
-          <div className="bg-white rounded-t-2xl w-full p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-t-2xl w-full px-5 pt-5 pb-10">
+            <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-bold text-[#0F172A]">📅 Choisir une période</h2>
               <button
                 onClick={() => { setShowCustom(false); setPeriod('today') }}
-                className="text-[#64748B] text-xl"
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-[#64748B]"
               >
                 ✕
               </button>
             </div>
-            <div className="space-y-4 mb-5">
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Du
-                </label>
-                <input
-                  type="date"
-                  value={customStart}
-                  onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Au (optionnel)
-                </label>
-                <input
-                  type="date"
-                  value={customEnd}
-                  onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
-                />
-              </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Du</label>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                style={{ WebkitAppearance: 'none' }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+              />
             </div>
+
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                style={{ WebkitAppearance: 'none' }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+              />
+            </div>
+
             <button
               onClick={handleCustomSearch}
               disabled={!customStart}
-              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 text-sm font-semibold disabled:opacity-50"
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-4 text-sm font-bold disabled:opacity-50"
             >
               Voir les stats
             </button>
