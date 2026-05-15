@@ -142,7 +142,7 @@ export default function Stocks() {
     }
   }
 
-  const { formatAmount } = useCurrency()
+  const { formatAmount, currency } = useCurrency()
 
   const totalValue = products.reduce((sum, p) => sum + p.price_sell * p.quantity, 0)
   const lowStockCount = products.filter(p => p.quantity <= p.alert_threshold).length
@@ -166,8 +166,8 @@ export default function Stocks() {
 
   const fields = [
     { key: 'name', label: 'Nom du produit', placeholder: 'Ex: Sucre 1kg' },
-    { key: 'price_sell', label: 'Prix de vente (FC)', placeholder: '1500', type: 'number' },
-    { key: 'price_buy', label: "Prix d'achat (FC)", placeholder: '1000', type: 'number' },
+    { key: 'price_sell', label: `Prix de vente (${currency})`, placeholder: '1500', type: 'number' },
+    { key: 'price_buy', label: `Prix d'achat (${currency})`, placeholder: '1000', type: 'number' },
     { key: 'quantity', label: 'Quantité en stock', placeholder: '10', type: 'number' },
     { key: 'alert_threshold', label: 'Alerte stock bas à', placeholder: '5', type: 'number' },
   ]
@@ -181,7 +181,7 @@ export default function Stocks() {
           {[
             { label: 'Produits', value: products.length, color: 'white' },
             { label: 'Stock bas', value: lowStockCount, color: lowStockCount > 0 ? '#fca5a5' : 'white' },
-            { label: 'Valeur FC', value: new Intl.NumberFormat('fr-FR').format(Math.round(totalValue)), color: 'white' },
+            { label: `Valeur ${currency}`, value: new Intl.NumberFormat('fr-FR').format(Math.round(totalValue)), color: 'white' },
           ].map((s, i) => (
             <div key={i} className="bg-white/12 rounded-xl p-2 text-center border border-white/20">
               <p className="font-bold text-base" style={{ color: s.color }}>{s.value}</p>

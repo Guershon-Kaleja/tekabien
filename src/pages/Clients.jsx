@@ -227,7 +227,7 @@ export default function Clients() {
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
   }
 
-  const { formatAmount } = useCurrency()
+  const { formatAmount, currency } = useCurrency()
 
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
@@ -507,7 +507,7 @@ export default function Clients() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant (FC)</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant ({currency})</label>
                 <input
                   type="number"
                   value={debtForm.amount}
@@ -547,7 +547,7 @@ export default function Clients() {
               <p className="text-xs text-[#64748B] mt-1">Modifie uniquement pour corriger une erreur.</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nouveau montant (FC)</label>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nouveau montant ({currency})</label>
               <input
                 type="number"
                 value={editDebtAmount}
@@ -575,7 +575,7 @@ export default function Clients() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant remboursé (FC)</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant remboursé ({currency})</label>
                 <input
                   type="number"
                   value={payForm.amount}
