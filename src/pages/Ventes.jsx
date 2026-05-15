@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import { canAddSale, getPlanLimits } from '../lib/planLimits'
-import { saveSaleOffline, getCleanPendingSales, getPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
+import { saveSaleOffline, getCleanPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -37,6 +37,11 @@ export default function Ventes() {
   const [allSales, setAllSales] = useState([])
   const [salesLoading, setSalesLoading] = useState(false)
   const [historyFilter, setHistoryFilter] = useState('today')
+  const [historyCustomStart, setHistoryCustomStart] = useState('')
+  const [historyCustomEnd, setHistoryCustomEnd] = useState('')
+  const [showHistoryCustom, setShowHistoryCustom] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(null)
+  const [cancelling, setCancelling] = useState(false)
 
   const paymentLabel = (method) => ({
     cash: 'Cash', airtel: 'Airtel Money',
@@ -51,52 +56,27 @@ export default function Ventes() {
   const syncPendingSales = async (uid) => {
     try {
       const id = uid || userId
-      if (!id) {
-        setPendingCount(0)
-        return
-      }
+      if (!id) { setPendingCount(0); return }
 
       const pending = await getCleanPendingSales(id)
-      if (pending.length === 0) {
-        setPendingCount(0)
-        return
-      }
+      if (pending.length === 0) { setPendingCount(0); return }
 
       for (const { local_id, saleData } of pending) {
-        console.log('=== SYNC SALE ===')
-        console.log('saleData:', JSON.stringify(saleData))
-
         const { error: saleError } = await supabase.from('sales').insert(saleData)
-        console.log('Sale insert error:', saleError)
-
         if (!saleError) {
           await markSaleSynced(local_id)
-
-          // Mettre à jour le stock dans Supabase
           if (saleData.product_id) {
-            const { data: product, error: productError } = await supabase
-              .from('products')
-              .select('quantity')
-              .eq('id', saleData.product_id)
-              .eq('user_id', id)
-              .single()
-
-            console.log('Product found:', product, 'error:', productError)
-
+            const { data: product } = await supabase
+              .from('products').select('quantity')
+              .eq('id', saleData.product_id).eq('user_id', id).single()
             if (product) {
-              const newQty = Math.max(0, product.quantity - saleData.quantity)
-              const { error: updateError } = await supabase
-                .from('products')
-                .update({ quantity: newQty })
-                .eq('id', saleData.product_id)
-                .eq('user_id', id)
-
-              console.log('Stock update error:', updateError, 'new qty:', newQty)
+              await supabase.from('products')
+                .update({ quantity: Math.max(0, product.quantity - saleData.quantity) })
+                .eq('id', saleData.product_id).eq('user_id', id)
             }
           }
         }
       }
-
       setPendingCount(0)
       fetchData()
     } catch (err) {
@@ -111,41 +91,27 @@ export default function Ventes() {
     setUserId(user.id)
 
     const { data: userData } = await supabase
-      .from('users')
-      .select('plan')
-      .eq('id', user.id)
-      .single()
+      .from('users').select('plan').eq('id', user.id).single()
     if (userData) setUserPlan(userData.plan)
 
     const { data: productsData } = await supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name')
+      .from('products').select('*').eq('user_id', user.id).order('name')
     if (productsData) setProducts(productsData)
 
     const { data: clientsData } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name')
+      .from('customers').select('*').eq('user_id', user.id).order('name')
     if (clientsData) setClients(clientsData)
 
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
     const { data: salesData } = await supabase
-      .from('sales')
-      .select('id')
-      .eq('user_id', user.id)
+      .from('sales').select('id').eq('user_id', user.id)
       .gte('created_at', startOfDay.toISOString())
     if (salesData) setTodaySalesCount(salesData.length)
 
     const pending = await getCleanPendingSales(user.id)
-    console.log('=== PENDING SALES ===', pending.length, JSON.stringify(pending))
     setPendingCount(pending.length)
-    if (pending.length > 0 && navigator.onLine) {
-      syncPendingSales(user.id)
-    }
+    if (pending.length > 0 && navigator.onLine) syncPendingSales(user.id)
   }
 
   const fetchAllSales = async () => {
@@ -154,19 +120,31 @@ export default function Ventes() {
     if (!user) return
 
     const start = new Date()
-    if (historyFilter === 'today') start.setHours(0, 0, 0, 0)
-    else if (historyFilter === 'week') start.setDate(start.getDate() - 7)
-    else if (historyFilter === 'month') start.setDate(1)
+    const end = new Date()
+
+    if (historyFilter === 'today') {
+      start.setHours(0, 0, 0, 0)
+    } else if (historyFilter === 'week') {
+      start.setDate(start.getDate() - 7)
+      start.setHours(0, 0, 0, 0)
+    } else if (historyFilter === 'month') {
+      start.setDate(1)
+      start.setHours(0, 0, 0, 0)
+    }
 
     let query = supabase
-      .from('sales')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(100)
+      .from('sales').select('*').eq('user_id', user.id)
+      .order('created_at', { ascending: false }).limit(100)
 
-    if (historyFilter !== 'all') {
-      query = query.gte('created_at', start.toISOString())
+    if (historyFilter === 'custom' && historyCustomStart) {
+      const cEnd = historyCustomEnd || historyCustomStart
+      query = query
+        .gte('created_at', new Date(historyCustomStart).toISOString())
+        .lte('created_at', new Date(cEnd + 'T23:59:59').toISOString())
+    } else if (historyFilter !== 'custom') {
+      query = query
+        .gte('created_at', start.toISOString())
+        .lte('created_at', end.toISOString())
     }
 
     const { data } = await query
@@ -176,7 +154,6 @@ export default function Ventes() {
 
   useEffect(() => {
     fetchData()
-
     const handleOnline = () => {
       setOnline(true)
       setShowOnlineBanner(true)
@@ -184,12 +161,9 @@ export default function Ventes() {
       fetchData()
     }
     const handleOffline = () => setOnline(false)
-
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
-
     const timer = setTimeout(() => setShowOnlineBanner(false), 3000)
-
     return () => {
       clearTimeout(timer)
       window.removeEventListener('online', handleOnline)
@@ -198,7 +172,7 @@ export default function Ventes() {
   }, [])
 
   useEffect(() => {
-    if (activeTab === 'history') fetchAllSales()
+    if (activeTab === 'history' && historyFilter !== 'custom') fetchAllSales()
   }, [activeTab, historyFilter])
 
   const filtered = products.filter(p =>
@@ -222,27 +196,21 @@ export default function Ventes() {
 
   const formatDateTime = (dateStr) => {
     const d = new Date(dateStr)
-    return d.toLocaleDateString('fr-FR', {
-      day: '2-digit', month: '2-digit'
-    }) + ' à ' + d.toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit'
-    })
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) +
+      ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   }
 
   const handleConfirm = async () => {
     if (!selected) { setError('Sélectionne un produit'); return }
     if (quantity <= 0) { setError('La quantité doit être supérieure à 0'); return }
     if (quantity > selected.quantity) {
-      setError(`Stock insuffisant — ${selected.quantity} unités disponibles`)
-      return
+      setError(`Stock insuffisant — ${selected.quantity} unités disponibles`); return
     }
     if (!canAddSale(userPlan, todaySalesCount)) {
-      setError(`Limite atteinte — ton plan permet ${getPlanLimits(userPlan).maxSalesPerDay} ventes par jour.`)
-      return
+      setError(`Limite atteinte — ton plan permet ${getPlanLimits(userPlan).maxSalesPerDay} ventes par jour.`); return
     }
     if (payment === 'credit' && !selectedClient) {
-      setError('Sélectionne un client pour la vente à crédit')
-      return
+      setError('Sélectionne un client pour la vente à crédit'); return
     }
     setError('')
     setLoading(true)
@@ -251,13 +219,12 @@ export default function Ventes() {
       user_id: userId,
       product_id: selected.id,
       product_name: sanitize(selected.name),
-      quantity,
-      total,
+      quantity, total,
       cost: (selected.price_buy || 0) * quantity,
       payment_method: payment,
       customer_id: payment === 'credit' ? selectedClient?.id : null,
       customer_name: payment === 'credit' ? selectedClient?.name : null,
-      encaissee: payment !== 'credit', // ← false si crédit
+      encaissee: payment !== 'credit',
     }
 
     if (!isOnline()) {
@@ -265,46 +232,29 @@ export default function Ventes() {
       setPendingCount(prev => prev + 1)
       setSuccess(true)
       setTodaySalesCount(prev => prev + 1)
-
-      // Mettre à jour le stock localement
       setProducts(prev => prev.map(p =>
-        p.id === selected.id
-          ? { ...p, quantity: p.quantity - quantity }
-          : p
+        p.id === selected.id ? { ...p, quantity: p.quantity - quantity } : p
       ))
-
       setTimeout(() => {
-        setSuccess(false)
-        setSelected(null)
-        setQuantity(1)
-        setPayment('cash')
-        setSelectedClient(null)
-        setError('')
+        setSuccess(false); setSelected(null); setQuantity(1)
+        setPayment('cash'); setSelectedClient(null); setError('')
       }, 1500)
       setLoading(false)
       return
     }
 
     const { error: saleError } = await supabase.from('sales').insert(saleData)
-
     if (!saleError) {
-      await supabase
-        .from('products')
-        .update({ quantity: selected.quantity - quantity })
-        .eq('id', selected.id)
+      await supabase.from('products')
+        .update({ quantity: selected.quantity - quantity }).eq('id', selected.id)
 
       if (payment === 'credit' && selectedClient) {
         await supabase.from('debts').insert({
-          user_id: userId,
-          customer_id: selectedClient.id,
-          amount: total,
-          paid: 0,
-          status: 'pending',
+          user_id: userId, customer_id: selectedClient.id,
+          amount: total, paid: 0, status: 'pending',
           note: `Vente crédit — ${sanitize(selected.name)}`,
         })
-
-        await supabase
-          .from('customers')
+        await supabase.from('customers')
           .update({ total_debt: selectedClient.total_debt + total })
           .eq('id', selectedClient.id)
       }
@@ -312,20 +262,45 @@ export default function Ventes() {
       setSuccess(true)
       setTodaySalesCount(prev => prev + 1)
       setTimeout(() => {
-        setSuccess(false)
-        setSelected(null)
-        setQuantity(1)
-        setPayment('cash')
-        setSelectedClient(null)
-        setError('')
+        setSuccess(false); setSelected(null); setQuantity(1)
+        setPayment('cash'); setSelectedClient(null); setError('')
         fetchData()
       }, 1500)
     } else {
       setError("Erreur lors de l'enregistrement — réessaie")
-      console.error('Sale error:', saleError)
     }
-
     setLoading(false)
+  }
+
+  const handleCancelSale = async (sale) => {
+    setCancelling(true)
+    try {
+      const { error } = await supabase.from('sales').delete().eq('id', sale.id)
+      if (!error) {
+        if (sale.product_id) {
+          const { data: product } = await supabase
+            .from('products').select('quantity').eq('id', sale.product_id).single()
+          if (product) {
+            await supabase.from('products')
+              .update({ quantity: product.quantity + sale.quantity }).eq('id', sale.product_id)
+          }
+        }
+        if (sale.payment_method === 'credit' && sale.customer_id) {
+          const { data: customer } = await supabase
+            .from('customers').select('total_debt').eq('id', sale.customer_id).single()
+          if (customer) {
+            await supabase.from('customers')
+              .update({ total_debt: Math.max(0, customer.total_debt - sale.total) })
+              .eq('id', sale.customer_id)
+          }
+        }
+        setShowCancelConfirm(null)
+        fetchAllSales()
+      }
+    } catch (err) {
+      console.error('Erreur annulation:', err)
+    }
+    setCancelling(false)
   }
 
   const paymentMethods = [
@@ -338,60 +313,8 @@ export default function Ventes() {
 
   const limitReached = !canAddSale(userPlan, todaySalesCount)
   const totalHistory = filteredHistory.reduce((sum, s) => sum + s.total, 0)
-
   const getInitials = (name) =>
     name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-
-  const [showCancelConfirm, setShowCancelConfirm] = useState(null)
-  const [cancelling, setCancelling] = useState(false)
-
-  const handleCancelSale = async (sale) => {
-    setCancelling(true)
-    try {
-      const { error } = await supabase
-        .from('sales')
-        .delete()
-        .eq('id', sale.id)
-
-      if (!error) {
-        if (sale.product_id) {
-          const { data: product } = await supabase
-            .from('products')
-            .select('quantity')
-            .eq('id', sale.product_id)
-            .single()
-
-          if (product) {
-            await supabase
-              .from('products')
-              .update({ quantity: product.quantity + sale.quantity })
-              .eq('id', sale.product_id)
-          }
-        }
-
-        if (sale.payment_method === 'credit' && sale.customer_id) {
-          const { data: customer } = await supabase
-            .from('customers')
-            .select('total_debt')
-            .eq('id', sale.customer_id)
-            .single()
-
-          if (customer) {
-            await supabase
-              .from('customers')
-              .update({ total_debt: Math.max(0, customer.total_debt - sale.total) })
-              .eq('id', sale.customer_id)
-          }
-        }
-
-        setShowCancelConfirm(null)
-        fetchAllSales()
-      }
-    } catch (err) {
-      console.error('Erreur annulation:', err)
-    }
-    setCancelling(false)
-  }
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-8">
@@ -402,9 +325,7 @@ export default function Ventes() {
         <button
           onClick={() => setActiveTab('new')}
           className={`flex-1 py-3 text-xs font-semibold transition-colors ${
-            activeTab === 'new'
-              ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
-              : 'text-[#64748B]'
+            activeTab === 'new' ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]' : 'text-[#64748B]'
           }`}
         >
           + Nouvelle vente
@@ -412,9 +333,7 @@ export default function Ventes() {
         <button
           onClick={() => setActiveTab('history')}
           className={`flex-1 py-3 text-xs font-semibold transition-colors ${
-            activeTab === 'history'
-              ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
-              : 'text-[#64748B]'
+            activeTab === 'history' ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]' : 'text-[#64748B]'
           }`}
         >
           📋 Historique
@@ -477,20 +396,14 @@ export default function Ventes() {
                 </div>
                 <p className="text-lg font-bold text-[#0F172A]">Vente enregistrée !</p>
                 <p className="text-sm text-[#64748B] mt-1">{formatFC(total)}</p>
-               {payment === 'credit' && selectedClient && (
+                {payment === 'credit' && selectedClient && (
                   <div className="mt-2">
-                    <p className="text-xs text-[#F5A623]">
-                      💳 Dette ajoutée pour {selectedClient.name}
-                    </p>
-                    <p className="text-xs text-[#B45309] mt-1">
-                      ⏳ Sera comptabilisée au remboursement
-                    </p>
+                    <p className="text-xs text-[#F5A623]">💳 Dette ajoutée pour {selectedClient.name}</p>
+                    <p className="text-xs text-[#B45309] mt-1">⏳ Sera comptabilisée au remboursement</p>
                   </div>
                 )}
                 {!online && (
-                  <p className="text-xs text-[#F5A623] mt-2">
-                    📶 Sera synchronisée au retour du réseau
-                  </p>
+                  <p className="text-xs text-[#F5A623] mt-2">📶 Sera synchronisée au retour du réseau</p>
                 )}
               </div>
             </div>
@@ -528,10 +441,7 @@ export default function Ventes() {
                 <p className="text-3xl mb-2">📦</p>
                 <p className="text-sm font-semibold text-[#0F172A]">Aucun produit</p>
                 <p className="text-xs text-[#64748B] mt-1">Ajoute d'abord des produits dans Stocks</p>
-                <button
-                  onClick={() => navigate('/stocks')}
-                  className="mt-3 text-xs text-[#1A56DB] font-medium"
-                >
+                <button onClick={() => navigate('/stocks')} className="mt-3 text-xs text-[#1A56DB] font-medium">
                   Aller aux stocks →
                 </button>
               </div>
@@ -541,27 +451,18 @@ export default function Ventes() {
                   <button
                     key={p.id}
                     onClick={() => {
-                      if (limitReached) {
-                        setError('Limite atteinte — passe au Pro')
-                        return
-                      }
-                      setSelected(p)
-                      setQuantity(1)
-                      setError('')
+                      if (limitReached) { setError('Limite atteinte — passe au Pro'); return }
+                      setSelected(p); setQuantity(1); setError('')
                     }}
                     className={`text-left p-3 rounded-xl border transition-all ${
-                      selected?.id === p.id
-                        ? 'border-[#1A56DB] bg-[#EBF2FF] border-2'
-                        : limitReached
-                        ? 'border-gray-200 bg-gray-50 opacity-50'
+                      selected?.id === p.id ? 'border-[#1A56DB] bg-[#EBF2FF] border-2'
+                        : limitReached ? 'border-gray-200 bg-gray-50 opacity-50'
                         : 'border-gray-200 bg-white'
                     }`}
                   >
                     <p className="text-xs font-semibold text-[#0F172A] mb-1">{p.name}</p>
                     <p className="text-sm font-bold text-[#1A56DB]">{formatFC(p.price_sell)}</p>
-                    <p className={`text-xs mt-1 ${
-                      p.quantity <= p.alert_threshold ? 'text-[#DC2626]' : 'text-[#64748B]'
-                    }`}>
+                    <p className={`text-xs mt-1 ${p.quantity <= p.alert_threshold ? 'text-[#DC2626]' : 'text-[#64748B]'}`}>
                       {p.quantity <= p.alert_threshold ? '⚠️ ' : ''}Stock : {p.quantity}
                     </p>
                   </button>
@@ -598,16 +499,12 @@ export default function Ventes() {
                     <button
                       onClick={() => setQuantity(Math.max(1, quantity - 1))}
                       className="w-8 h-8 bg-[#EBF2FF] rounded-lg flex items-center justify-center text-[#1A56DB] font-bold"
-                    >
-                      −
-                    </button>
+                    >−</button>
                     <span className="text-lg font-bold text-[#0F172A] w-6 text-center">{quantity}</span>
                     <button
                       onClick={() => setQuantity(Math.min(selected.quantity, quantity + 1))}
                       className="w-8 h-8 bg-[#EBF2FF] rounded-lg flex items-center justify-center text-[#1A56DB] font-bold"
-                    >
-                      +
-                    </button>
+                    >+</button>
                   </div>
                 </div>
 
@@ -618,20 +515,14 @@ export default function Ventes() {
                   {paymentMethods.map((m) => (
                     <button
                       key={m.id}
-                      onClick={() => {
-                        setPayment(m.id)
-                        if (m.id !== 'credit') setSelectedClient(null)
-                      }}
+                      onClick={() => { setPayment(m.id); if (m.id !== 'credit') setSelectedClient(null) }}
                       className={`flex items-center gap-2 p-3 rounded-xl border text-sm font-medium transition-all ${
                         payment === m.id
                           ? 'border-[#1A56DB] bg-[#EBF2FF] text-[#1A56DB] border-2'
                           : 'border-gray-200 bg-white text-[#0F172A]'
                       } ${m.id === 'credit' ? 'col-span-2' : ''}`}
                     >
-                      <div
-                        className="w-2 h-2 rounded-full flex-shrink-0"
-                        style={{ background: m.color }}
-                      />
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: m.color }} />
                       {m.label}
                     </button>
                   ))}
@@ -653,10 +544,7 @@ export default function Ventes() {
                             <p className="text-xs text-[#64748B]">{selectedClient.phone || 'Pas de téléphone'}</p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => setSelectedClient(null)}
-                          className="text-xs text-[#DC2626] font-medium"
-                        >
+                        <button onClick={() => setSelectedClient(null)} className="text-xs text-[#DC2626] font-medium">
                           Changer
                         </button>
                       </div>
@@ -671,10 +559,7 @@ export default function Ventes() {
                     {clients.length === 0 && (
                       <p className="text-xs text-[#64748B] mt-2 text-center">
                         Aucun client —{' '}
-                        <span
-                          onClick={() => navigate('/clients')}
-                          className="text-[#1A56DB] cursor-pointer font-medium"
-                        >
+                        <span onClick={() => navigate('/clients')} className="text-[#1A56DB] cursor-pointer font-medium">
                           Ajouter un client
                         </span>
                       </p>
@@ -722,14 +607,21 @@ export default function Ventes() {
 
           <div className="flex gap-2 mb-3">
             {[
-              { id: 'today', label: "Aujourd'hui" },
-              { id: 'week', label: 'Semaine' },
-              { id: 'month', label: 'Mois' },
-              { id: 'all', label: 'Tout' },
+              { id: 'today', label: "Auj." },
+              { id: 'week', label: '7 jours' },
+              { id: 'month', label: 'Ce mois' },
+              { id: 'custom', label: '📅 Date' },
             ].map((f) => (
               <button
                 key={f.id}
-                onClick={() => setHistoryFilter(f.id)}
+                onClick={() => {
+                  setHistoryFilter(f.id)
+                  if (f.id === 'custom') {
+                    setShowHistoryCustom(true)
+                  } else {
+                    setShowHistoryCustom(false)
+                  }
+                }}
                 className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
                   historyFilter === f.id
                     ? 'bg-[#1A56DB] text-white border-[#1A56DB]'
@@ -802,49 +694,94 @@ export default function Ventes() {
               </div>
             ))
           )}
-
-          {/* Modal confirmation annulation */}
-          {showCancelConfirm && (
-            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-5">
-                <div className="text-center mb-4">
-                  <p className="text-3xl mb-3">🗑️</p>
-                  <h2 className="text-base font-bold text-[#0F172A]">Annuler cette vente ?</h2>
-                  <p className="text-sm text-[#64748B] mt-1">
-                    <span className="font-semibold text-[#0F172A]">{showCancelConfirm.product_name}</span> — {formatFC(showCancelConfirm.total)}
-                  </p>
-                  <p className="text-xs text-[#64748B] mt-2">
-                    Le stock sera restitué automatiquement.
-                  </p>
-                  {showCancelConfirm.payment_method === 'credit' && showCancelConfirm.customer_name && (
-                    <p className="text-xs text-[#F5A623] mt-1">
-                      La dette de {showCancelConfirm.customer_name} sera aussi réduite.
-                    </p>
-                  )}
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowCancelConfirm(null)}
-                    disabled={cancelling}
-                    className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
-                  >
-                    Garder
-                  </button>
-                  <button
-                    onClick={() => handleCancelSale(showCancelConfirm)}
-                    disabled={cancelling}
-                    className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
-                  >
-                    {cancelling ? 'Annulation...' : 'Annuler la vente'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
       )}
 
+      {/* Modal confirmation annulation */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="text-center mb-4">
+              <p className="text-3xl mb-3">🗑️</p>
+              <h2 className="text-base font-bold text-[#0F172A]">Annuler cette vente ?</h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                <span className="font-semibold text-[#0F172A]">{showCancelConfirm.product_name}</span> — {formatFC(showCancelConfirm.total)}
+              </p>
+              <p className="text-xs text-[#64748B] mt-2">Le stock sera restitué automatiquement.</p>
+              {showCancelConfirm.payment_method === 'credit' && showCancelConfirm.customer_name && (
+                <p className="text-xs text-[#F5A623] mt-1">
+                  La dette de {showCancelConfirm.customer_name} sera aussi réduite.
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowCancelConfirm(null)}
+                disabled={cancelling}
+                className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
+              >
+                Garder
+              </button>
+              <button
+                onClick={() => handleCancelSale(showCancelConfirm)}
+                disabled={cancelling}
+                className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+              >
+                {cancelling ? 'Annulation...' : 'Annuler la vente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal date personnalisée historique — bottom sheet */}
+      {showHistoryCustom && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full px-5 pt-5 pb-10">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-base font-bold text-[#0F172A]">📅 Choisir une période</h2>
+              <button
+                onClick={() => { setShowHistoryCustom(false); setHistoryFilter('today') }}
+                className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-[#64748B]"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Du</label>
+              <input
+                type="date"
+                value={historyCustomStart}
+                onChange={(e) => setHistoryCustomStart(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB]"
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
+              <input
+                type="date"
+                value={historyCustomEnd}
+                onChange={(e) => setHistoryCustomEnd(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB]"
+              />
+            </div>
+            <button
+              onClick={() => {
+                if (!historyCustomStart) return
+                if (!historyCustomEnd) setHistoryCustomEnd(historyCustomStart)
+                setShowHistoryCustom(false)
+                fetchAllSales()
+              }}
+              disabled={!historyCustomStart}
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-4 text-sm font-bold disabled:opacity-50"
+            >
+              Voir l'historique
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal sélection client */}
       {showClientPicker && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[70vh] flex flex-col">
@@ -878,10 +815,8 @@ export default function Ventes() {
                   <button
                     key={c.id}
                     onClick={() => {
-                      setSelectedClient(c)
-                      setShowClientPicker(false)
-                      setClientSearch('')
-                      setError('')
+                      setSelectedClient(c); setShowClientPicker(false)
+                      setClientSearch(''); setError('')
                     }}
                     className="w-full flex items-center gap-3 p-3 rounded-xl border border-gray-100 bg-white mb-2 text-left"
                   >
@@ -893,9 +828,7 @@ export default function Ventes() {
                       <p className="text-xs text-[#64748B]">{c.phone || 'Pas de téléphone'}</p>
                     </div>
                     {c.total_debt > 0 && (
-                      <span className="text-xs text-[#DC2626] font-medium">
-                        {formatFC(c.total_debt)} dû
-                      </span>
+                      <span className="text-xs text-[#DC2626] font-medium">{formatFC(c.total_debt)} dû</span>
                     )}
                   </button>
                 ))
