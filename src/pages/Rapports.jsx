@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pi
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Rapports() {
   const navigate = useNavigate()
@@ -141,8 +142,7 @@ export default function Rapports() {
     fetchStats()
   }
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const formatFCShort = (amount) => {
     if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M'
@@ -184,7 +184,7 @@ export default function Rapports() {
         <div className="bg-white/12 rounded-xl p-3 border border-white/20">
           <p className="text-blue-200 text-xs uppercase tracking-wide mb-1">Bénéfice net — {getPeriodLabel()}</p>
           <p className={`text-3xl font-bold ${stats.netProfit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-            {stats.netProfit >= 0 ? '+' : ''}{formatFC(stats.netProfit)}
+            {stats.netProfit >= 0 ? '+' : ''}{formatAmount(stats.netProfit)}
           </p>
           <p className="text-blue-200 text-xs mt-1">
             {stats.netProfit >= 0 ? "✅ Tu gagnes de l'argent" : "⚠️ Tu perds de l'argent"}
@@ -192,15 +192,15 @@ export default function Rapports() {
           <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-white/10 rounded-lg p-2 text-center">
               <p className="text-blue-200 text-xs mb-1">Encaissé</p>
-              <p className="text-white font-bold text-sm">{formatFC(stats.totalSales)}</p>
+              <p className="text-white font-bold text-sm">{formatAmount(stats.totalSales)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2 text-center">
               <p className="text-blue-200 text-xs mb-1">Coût achat</p>
-              <p className="text-yellow-300 font-bold text-sm">{formatFC(stats.totalCost)}</p>
+              <p className="text-yellow-300 font-bold text-sm">{formatAmount(stats.totalCost)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2 text-center">
               <p className="text-blue-200 text-xs mb-1">Dépenses</p>
-              <p className="text-red-300 font-bold text-sm">{formatFC(stats.totalExpenses)}</p>
+              <p className="text-red-300 font-bold text-sm">{formatAmount(stats.totalExpenses)}</p>
             </div>
           </div>
         </div>
@@ -249,7 +249,7 @@ export default function Rapports() {
                     ⏳ {stats.creditPending} vente{stats.creditPending > 1 ? 's' : ''} crédit en attente
                   </p>
                   <p className="text-xs text-[#64748B] mt-0.5">
-                    Non comptabilisées — {formatFC(stats.creditAmount)}
+                    Non comptabilisées — {formatAmount(stats.creditAmount)}
                   </p>
                 </div>
                 <button
@@ -284,7 +284,7 @@ export default function Rapports() {
                         width={40}
                       />
                       <Tooltip
-                        formatter={(value) => [formatFC(value), 'Ventes']}
+                        formatter={(value) => [formatAmount(value), 'Ventes']}
                         labelStyle={{ fontSize: 12 }}
                         contentStyle={{ borderRadius: 8, fontSize: 12 }}
                       />
@@ -323,7 +323,7 @@ export default function Rapports() {
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => formatFC(value)} />
+                      <Tooltip formatter={(value) => formatAmount(value)} />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
@@ -359,7 +359,7 @@ export default function Rapports() {
                         <p className="text-sm font-medium text-[#0F172A]">{p.name}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-bold text-[#16A34A]">+{formatFC(p.margin)}</p>
+                        <p className="text-xs font-bold text-[#16A34A]">+{formatAmount(p.margin)}</p>
                         <p className="text-xs text-[#64748B]">{p.count} vendus</p>
                       </div>
                     </div>
@@ -396,7 +396,7 @@ export default function Rapports() {
                       style={{ background: paymentColor(pm.method) }}
                     />
                     <p className="text-sm text-[#0F172A] flex-1">{paymentLabel(pm.method)}</p>
-                    <p className="text-sm font-bold text-[#0F172A]">{formatFC(pm.total)}</p>
+                    <p className="text-sm font-bold text-[#0F172A]">{formatAmount(pm.total)}</p>
                   </div>
                 ))}
               </div>

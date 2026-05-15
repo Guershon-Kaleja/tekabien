@@ -5,6 +5,7 @@ import { canAddClient, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Clients() {
   usePlanCheck()
@@ -155,7 +156,7 @@ export default function Clients() {
       setPayErrors({ amount: 'Le montant doit être supérieur à 0' }); return
     }
     if (amount > selectedClient.total_debt) {
-      setPayErrors({ amount: `Le montant ne peut pas dépasser la dette (${formatFC(selectedClient.total_debt)})` }); return
+      setPayErrors({ amount: `Le montant ne peut pas dépasser la dette (${formatAmount(selectedClient.total_debt)})` }); return
     }
     setPayErrors({})
 
@@ -220,14 +221,13 @@ export default function Clients() {
 
   const handleWhatsApp = (client) => {
     const msg = encodeURIComponent(
-      `Bonjour ${client.name}, nous vous rappelons que vous avez une dette de ${formatFC(client.total_debt)} à notre boutique. Merci de régulariser dès que possible.`
+      `Bonjour ${client.name}, nous vous rappelons que vous avez une dette de ${formatAmount(client.total_debt)} à notre boutique. Merci de régulariser dès que possible.`
     )
     const phone = client.phone?.replace(/\s/g, '').replace('+', '')
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
   }
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
@@ -254,7 +254,7 @@ export default function Clients() {
         <div className="bg-white/12 rounded-xl p-3 border border-white/20 flex items-center justify-between">
           <div>
             <p className="text-blue-200 text-xs uppercase tracking-wide mb-1">Total dû</p>
-            <p className="text-white text-2xl font-bold">{formatFC(totalDebt)}</p>
+            <p className="text-white text-2xl font-bold">{formatAmount(totalDebt)}</p>
             <p className="text-blue-200 text-xs mt-1">par {clients.length} clients</p>
           </div>
           <div className="bg-red-500/30 rounded-xl px-4 py-3 text-center">
@@ -325,12 +325,12 @@ export default function Clients() {
                   <p className="text-sm font-semibold text-[#0F172A]">{c.name}</p>
                   <p className="text-xs text-[#64748B]">{c.phone || 'Pas de téléphone'}</p>
                   {c.total_paid > 0 && (
-                    <p className="text-xs text-[#16A34A]">✓ {formatFC(c.total_paid)} déjà remboursé</p>
+                    <p className="text-xs text-[#16A34A]">✓ {formatAmount(c.total_paid)} déjà remboursé</p>
                   )}
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <p className={`text-base font-bold ${c.total_debt > 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'}`}>
-                    {formatFC(c.total_debt)}
+                    {formatAmount(c.total_debt)}
                   </p>
                   <p className="text-xs text-[#64748B]">{c.total_debt > 0 ? 'doit' : 'À jour ✓'}</p>
                 </div>
@@ -543,7 +543,7 @@ export default function Clients() {
               <button onClick={() => setShowEditDebt(false)} className="text-[#64748B] text-xl">✕</button>
             </div>
             <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4">
-              <p className="text-xs text-[#B45309]">⚠️ Dette actuelle : <span className="font-bold">{formatFC(selectedClient.total_debt)}</span></p>
+              <p className="text-xs text-[#B45309]">⚠️ Dette actuelle : <span className="font-bold">{formatAmount(selectedClient.total_debt)}</span></p>
               <p className="text-xs text-[#64748B] mt-1">Modifie uniquement pour corriger une erreur.</p>
             </div>
             <div>
@@ -571,7 +571,7 @@ export default function Clients() {
               <button onClick={() => { setShowPayForm(false); setPayErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
             <div className="bg-[#FEF2F2] border border-red-200 rounded-xl p-3 mb-4">
-              <p className="text-xs text-[#DC2626]">Dette restante : <span className="font-bold">{formatFC(selectedClient.total_debt)}</span></p>
+              <p className="text-xs text-[#DC2626]">Dette restante : <span className="font-bold">{formatAmount(selectedClient.total_debt)}</span></p>
             </div>
             <div className="space-y-3">
               <div>
@@ -580,13 +580,13 @@ export default function Clients() {
                   type="number"
                   value={payForm.amount}
                   onChange={(e) => { setPayForm({ ...payForm, amount: e.target.value }); setPayErrors({ ...payErrors, amount: null }) }}
-                  placeholder={`Max: ${formatFC(selectedClient.total_debt)}`}
+                  placeholder={`Max: ${formatAmount(selectedClient.total_debt)}`}
                   className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${payErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
                 {payErrors.amount && <p className="text-xs text-[#DC2626] mt-1">{payErrors.amount}</p>}
                 {payForm.amount && parseFloat(payForm.amount) > 0 && parseFloat(payForm.amount) <= selectedClient.total_debt && (
                   <p className="text-xs text-[#16A34A] mt-1">
-                    Reste après paiement : {formatFC(selectedClient.total_debt - parseFloat(payForm.amount))}
+                    Reste après paiement : {formatAmount(selectedClient.total_debt - parseFloat(payForm.amount))}
                   </p>
                 )}
               </div>
@@ -634,11 +634,11 @@ export default function Clients() {
             <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex justify-between">
               <div>
                 <p className="text-xs text-[#64748B]">Dette actuelle</p>
-                <p className="text-base font-bold text-[#DC2626]">{formatFC(selectedClient.total_debt)}</p>
+                <p className="text-base font-bold text-[#DC2626]">{formatAmount(selectedClient.total_debt)}</p>
               </div>
               <div className="text-right">
                 <p className="text-xs text-[#64748B]">Total remboursé</p>
-                <p className="text-base font-bold text-[#16A34A]">{formatFC(selectedClient.total_paid || 0)}</p>
+                <p className="text-base font-bold text-[#16A34A]">{formatAmount(selectedClient.total_paid || 0)}</p>
               </div>
             </div>
             <div className="overflow-y-auto flex-1">
@@ -655,7 +655,7 @@ export default function Clients() {
                       <p className="text-xs font-semibold text-[#0F172A]">{p.note || 'Remboursement'}</p>
                       <p className="text-xs text-[#64748B]">{formatDate(p.created_at)}</p>
                     </div>
-                    <p className="text-sm font-bold text-[#16A34A]">+{formatFC(p.amount)}</p>
+                    <p className="text-sm font-bold text-[#16A34A]">+{formatAmount(p.amount)}</p>
                   </div>
                 ))
               )}

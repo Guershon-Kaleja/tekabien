@@ -7,6 +7,7 @@ import { saveSaleOffline, getCleanPendingSales, markSaleSynced, isOnline } from 
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Ventes() {
   const navigate = useNavigate()
@@ -191,8 +192,7 @@ export default function Ventes() {
 
   const total = selected ? selected.price_sell * quantity : 0
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const formatDateTime = (dateStr) => {
     const d = new Date(dateStr)
@@ -395,7 +395,7 @@ export default function Ventes() {
                   <span className="text-4xl">✅</span>
                 </div>
                 <p className="text-lg font-bold text-[#0F172A]">Vente enregistrée !</p>
-                <p className="text-sm text-[#64748B] mt-1">{formatFC(total)}</p>
+                <p className="text-sm text-[#64748B] mt-1">{formatAmount(total)}</p>
                 {payment === 'credit' && selectedClient && (
                   <div className="mt-2">
                     <p className="text-xs text-[#F5A623]">💳 Dette ajoutée pour {selectedClient.name}</p>
@@ -461,7 +461,7 @@ export default function Ventes() {
                     }`}
                   >
                     <p className="text-xs font-semibold text-[#0F172A] mb-1">{p.name}</p>
-                    <p className="text-sm font-bold text-[#1A56DB]">{formatFC(p.price_sell)}</p>
+                    <p className="text-sm font-bold text-[#1A56DB]">{formatAmount(p.price_sell)}</p>
                     <p className={`text-xs mt-1 ${p.quantity <= p.alert_threshold ? 'text-[#DC2626]' : 'text-[#64748B]'}`}>
                       {p.quantity <= p.alert_threshold ? '⚠️ ' : ''}Stock : {p.quantity}
                     </p>
@@ -569,7 +569,7 @@ export default function Ventes() {
 
                 <div className="bg-[#0F172A] rounded-xl px-4 py-4 flex items-center justify-between mb-3">
                   <p className="text-sm text-white/70">Total à payer</p>
-                  <p className="text-2xl font-bold text-white">{formatFC(total)}</p>
+                  <p className="text-2xl font-bold text-white">{formatAmount(total)}</p>
                 </div>
 
                 <button
@@ -597,7 +597,7 @@ export default function Ventes() {
           <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex items-center justify-between">
             <div>
               <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Total</p>
-              <p className="text-xl font-bold text-[#1A56DB]">{formatFC(totalHistory)}</p>
+              <p className="text-xl font-bold text-[#1A56DB]">{formatAmount(totalHistory)}</p>
             </div>
             <div className="text-right">
               <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Transactions</p>
@@ -682,7 +682,7 @@ export default function Ventes() {
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-2">
-                    <span className="text-sm font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
+                    <span className="text-sm font-bold text-[#1A56DB]">{formatAmount(sale.total)}</span>
                     <button
                       onClick={() => setShowCancelConfirm(sale)}
                       className="text-xs text-[#DC2626] bg-[#FEF2F2] px-2 py-1 rounded-lg font-medium"
@@ -705,7 +705,7 @@ export default function Ventes() {
               <p className="text-3xl mb-3">🗑️</p>
               <h2 className="text-base font-bold text-[#0F172A]">Annuler cette vente ?</h2>
               <p className="text-sm text-[#64748B] mt-1">
-                <span className="font-semibold text-[#0F172A]">{showCancelConfirm.product_name}</span> — {formatFC(showCancelConfirm.total)}
+                <span className="font-semibold text-[#0F172A]">{showCancelConfirm.product_name}</span> — {formatAmount(showCancelConfirm.total)}
               </p>
               <p className="text-xs text-[#64748B] mt-2">Le stock sera restitué automatiquement.</p>
               {showCancelConfirm.payment_method === 'credit' && showCancelConfirm.customer_name && (
@@ -830,7 +830,7 @@ export default function Ventes() {
                       <p className="text-xs text-[#64748B]">{c.phone || 'Pas de téléphone'}</p>
                     </div>
                     {c.total_debt > 0 && (
-                      <span className="text-xs text-[#DC2626] font-medium">{formatFC(c.total_debt)} dû</span>
+                      <span className="text-xs text-[#DC2626] font-medium">{formatAmount(c.total_debt)} dû</span>
                     )}
                   </button>
                 ))

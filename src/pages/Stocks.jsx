@@ -5,6 +5,7 @@ import { canAddProduct, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Stocks() {
   usePlanCheck()
@@ -141,8 +142,7 @@ export default function Stocks() {
     }
   }
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const totalValue = products.reduce((sum, p) => sum + p.price_sell * p.quantity, 0)
   const lowStockCount = products.filter(p => p.quantity <= p.alert_threshold).length
@@ -243,7 +243,7 @@ export default function Stocks() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-[#0F172A] truncate">{p.name}</p>
-                  <p className="text-xs text-[#64748B]">{formatFC(p.price_sell)}/unité</p>
+                  <p className="text-xs text-[#64748B]">{formatAmount(p.price_sell)}/unité</p>
                   <div className="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all"

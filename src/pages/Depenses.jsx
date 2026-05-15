@@ -4,6 +4,7 @@ import { validateExpense, sanitize } from '../lib/validation'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Depenses() {
   usePlanCheck()
@@ -121,8 +122,7 @@ export default function Depenses() {
     }
   }
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const totalIncome = sales.reduce((sum, s) => sum + s.total, 0)
   const totalCost = sales.reduce((sum, s) => sum + (s.cost || 0), 0)
@@ -167,7 +167,7 @@ export default function Depenses() {
         <div className="bg-white/12 rounded-xl p-3 border border-white/20">
           <p className="text-blue-200 text-xs uppercase tracking-wide mb-1">Bénéfice net</p>
           <p className={`text-3xl font-bold ${netProfit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-            {netProfit >= 0 ? '+' : ''}{formatFC(netProfit)}
+            {netProfit >= 0 ? '+' : ''}{formatAmount(netProfit)}
           </p>
           <p className="text-blue-200 text-xs mt-1">
             {netProfit >= 0 ? "✅ Tu gagnes de l'argent" : "⚠️ Tu perds de l'argent"}
@@ -175,15 +175,15 @@ export default function Depenses() {
           <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-white/10 rounded-lg p-2">
               <p className="text-blue-200 text-xs mb-1">Ventes</p>
-              <p className="text-green-300 font-bold text-sm">{formatFC(totalIncome)}</p>
+              <p className="text-green-300 font-bold text-sm">{formatAmount(totalIncome)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2">
               <p className="text-blue-200 text-xs mb-1">Coût achat</p>
-              <p className="text-yellow-300 font-bold text-sm">{formatFC(totalCost)}</p>
+              <p className="text-yellow-300 font-bold text-sm">{formatAmount(totalCost)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2">
               <p className="text-blue-200 text-xs mb-1">Dépenses</p>
-              <p className="text-red-300 font-bold text-sm">{formatFC(totalExpenses)}</p>
+              <p className="text-red-300 font-bold text-sm">{formatAmount(totalExpenses)}</p>
             </div>
           </div>
         </div>
@@ -236,7 +236,7 @@ export default function Depenses() {
                     {e.note || 'Aucune note'} · {formatDate(e.created_at)}
                   </p>
                 </div>
-                <span className="text-sm font-bold text-[#DC2626]">- {formatFC(e.amount)}</span>
+                <span className="text-sm font-bold text-[#DC2626]">- {formatAmount(e.amount)}</span>
               </div>
 
               <div className="flex gap-2 mt-3">
@@ -371,7 +371,7 @@ export default function Depenses() {
               <p className="text-3xl mb-3">🗑️</p>
               <h2 className="text-base font-bold text-[#0F172A]">Supprimer cette dépense ?</h2>
               <p className="text-sm text-[#64748B] mt-1">
-                <span className="font-semibold text-[#0F172A]">{getCategoryLabel(showDeleteConfirm.category)}</span> — {formatFC(showDeleteConfirm.amount)} sera supprimée définitivement.
+                <span className="font-semibold text-[#0F172A]">{getCategoryLabel(showDeleteConfirm.category)}</span> — {formatAmount(showDeleteConfirm.amount)} sera supprimée définitivement.
               </p>
             </div>
             <div className="flex gap-3">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
+import useCurrency from '../hooks/useCurrency'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -109,8 +110,7 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  const formatFC = (amount) =>
-    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+  const { formatAmount } = useCurrency()
 
   const formatTime = (dateStr) =>
     new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -195,7 +195,7 @@ export default function Dashboard() {
         </div>
         <div className="rounded-xl p-3 border" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }}>
           <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Ventes encaissées du jour</p>
-          <p className="text-white text-3xl font-bold">{formatFC(todaySales)}</p>
+          <p className="text-white text-3xl font-bold">{formatAmount(todaySales)}</p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{salesCount} ventes encaissées</p>
             {creditPending > 0 && (
@@ -260,14 +260,14 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Bénéfice net</p>
             <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-              {formatFC(netProfit)}
+              {formatAmount(netProfit)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">marge - dépenses</p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Clients en dette</p>
             <p className="text-xl font-bold text-[#DC2626]">{debtCount}</p>
-            <p className="text-xs text-[#64748B] mt-1">{formatFC(totalDebt)} dus</p>
+            <p className="text-xs text-[#64748B] mt-1">{formatAmount(totalDebt)} dus</p>
           </div>
         </div>
 
@@ -339,7 +339,7 @@ export default function Dashboard() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
+                <span className="text-xs font-bold text-[#1A56DB]">{formatAmount(sale.total)}</span>
               </div>
             ))}
           </>

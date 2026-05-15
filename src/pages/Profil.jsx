@@ -10,7 +10,7 @@ export default function Profil() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState(null)
-  const [form, setForm] = useState({ shop_name: '', phone: '' })
+  const [form, setForm] = useState({ shop_name: '', phone: '', currency: 'FC' })
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' })
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
@@ -29,12 +29,16 @@ export default function Profil() {
 
     const { data } = await supabase
       .from('users')
-      .select('shop_name, phone, plan, plan_expires')
+      .select('shop_name, phone, plan, plan_expires, currency')
       .eq('id', authUser.id)
       .single()
 
     if (data) {
-      setForm({ shop_name: data.shop_name || '', phone: data.phone || '' })
+      setForm({
+        shop_name: data.shop_name || '',
+        phone: data.phone || '',
+        currency: data.currency || 'FC',
+      })
       setUserPlan(data.plan)
       setPlanExpires(data.plan_expires)
     }
@@ -55,6 +59,7 @@ export default function Profil() {
       .update({
         shop_name: sanitize(form.shop_name),
         phone: sanitize(form.phone),
+        currency: form.currency,
       })
       .eq('id', user.id)
 
@@ -80,9 +85,7 @@ export default function Profil() {
     setPasswordError('')
     setSaving(true)
 
-    const { error } = await supabase.auth.updateUser({
-      password: passwordForm.new
-    })
+    const { error } = await supabase.auth.updateUser({ password: passwordForm.new })
 
     if (error) {
       setPasswordError('Erreur — réessaie')
@@ -101,24 +104,18 @@ export default function Profil() {
   }
 
   const getPlanLabel = (plan) => ({
-    trial: 'Essai gratuit',
-    pro: 'Pro',
-    business: 'Business',
-    free: 'Gratuit',
+    trial: 'Essai gratuit', pro: 'Pro',
+    business: 'Business', free: 'Gratuit',
   })[plan] || plan
 
   const getPlanColor = (plan) => ({
-    trial: '#B45309',
-    pro: '#16A34A',
-    business: '#1A56DB',
-    free: '#64748B',
+    trial: '#B45309', pro: '#16A34A',
+    business: '#1A56DB', free: '#64748B',
   })[plan] || '#64748B'
 
   const getPlanBg = (plan) => ({
-    trial: '#FFFBEB',
-    pro: '#F0FDF4',
-    business: '#EBF2FF',
-    free: '#F8FAFF',
+    trial: '#FFFBEB', pro: '#F0FDF4',
+    business: '#EBF2FF', free: '#F8FAFF',
   })[plan] || '#F8FAFF'
 
   if (loading) {
@@ -134,7 +131,6 @@ export default function Profil() {
 
       <Header title="Mon profil" />
 
-      {/* Onglets */}
       <div className="flex bg-white border-b border-gray-200">
         {[
           { id: 'profil', label: '👤 Profil' },
@@ -157,10 +153,8 @@ export default function Profil() {
 
       <div className="px-4 pt-4">
 
-        {/* ── ONGLET PROFIL ── */}
         {activeTab === 'profil' && (
           <>
-            {/* Avatar */}
             <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4 text-center">
               <div className="w-16 h-16 bg-[#1A56DB] rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <span className="text-3xl">🏪</span>
@@ -225,6 +219,36 @@ export default function Profil() {
                   />
                   <p className="text-xs text-[#64748B] mt-1">L'email ne peut pas être modifié</p>
                 </div>
+
+                {/* Choix de devise */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                    Devise de la boutique
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'FC', label: 'Franc Congolais', symbol: 'FC', desc: 'Ex: 5 000 FC' },
+                      { id: 'USD', label: 'Dollar américain', symbol: '$', desc: 'Ex: $2.50' },
+                    ].map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setForm({ ...form, currency: c.id })}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          form.currency === c.id
+                            ? 'border-[#1A56DB] bg-[#EBF2FF]'
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
+                        <p className="text-xs font-semibold text-[#0F172A]">{c.id}</p>
+                        <p className="text-xs text-[#64748B] mt-1">{c.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-[#64748B] mt-2">
+                    ⚠️ Changer la devise n'affecte pas les montants existants — uniquement l'affichage.
+                  </p>
+                </div>
               </div>
 
               <button
@@ -245,7 +269,6 @@ export default function Profil() {
           </>
         )}
 
-        {/* ── ONGLET SÉCURITÉ ── */}
         {activeTab === 'securite' && (
           <div className="bg-white rounded-xl border border-gray-200 p-4">
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
@@ -301,7 +324,6 @@ export default function Profil() {
           </div>
         )}
 
-        {/* ── ONGLET ABONNEMENT ── */}
         {activeTab === 'abonnement' && (
           <>
             <div
@@ -340,15 +362,9 @@ export default function Profil() {
                 <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
                   <div className="flex gap-4">
-                    <span className={`text-xs w-8 text-center ${f.free ? 'text-[#16A34A]' : 'text-gray-300'}`}>
-                      {f.free ? '✓' : '✗'}
-                    </span>
-                    <span className={`text-xs w-8 text-center ${f.pro ? 'text-[#16A34A]' : 'text-gray-300'}`}>
-                      {f.pro ? '✓' : '✗'}
-                    </span>
-                    <span className={`text-xs w-8 text-center ${f.business ? 'text-[#16A34A]' : 'text-gray-300'}`}>
-                      {f.business ? '✓' : '✗'}
-                    </span>
+                    <span className={`text-xs w-8 text-center ${f.free ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.free ? '✓' : '✗'}</span>
+                    <span className={`text-xs w-8 text-center ${f.pro ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.pro ? '✓' : '✗'}</span>
+                    <span className={`text-xs w-8 text-center ${f.business ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.business ? '✓' : '✗'}</span>
                   </div>
                 </div>
               ))}
