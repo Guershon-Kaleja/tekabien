@@ -11,7 +11,7 @@ const getHeaders = async () => {
   }
 }
 
-export const initiatePayment = async ({ phone, amount, currency = 'USD', plan }) => {
+export const initiatePayment = async ({ phone, plan, currency = 'USD' }) => {
   try {
     const cleanPhone = phone
       .replace(/\s/g, '')
@@ -24,13 +24,12 @@ export const initiatePayment = async ({ phone, amount, currency = 'USD', plan })
 
     const headers = await getHeaders()
 
+    // userId et amount ne sont plus envoyés — calculés côté serveur
     const payload = {
       action: 'pay',
       phone: cleanPhone,
-      amount: parseFloat(amount),
-      currency,
       plan,
-      userId: user.id,
+      currency,
     }
 
     console.log('Payload envoyé:', payload)
@@ -45,25 +44,12 @@ export const initiatePayment = async ({ phone, amount, currency = 'USD', plan })
     console.log('Réponse complète:', data)
 
     if (data?.success) {
-      // Utiliser l'orderNumber de Labyrinthe comme référence
-      const labyrinthRef = data.orderNumber || data.reference
-
-      console.log('Référence Labyrinthe:', labyrinthRef)
-
-      await supabase.from('payments').insert({
-        user_id: user.id,
-        reference: labyrinthRef,
-        order_number: labyrinthRef,
-        plan,
-        amount: parseFloat(amount),
-        currency,
-        status: 'pending',
-      })
+      console.log('Référence Labyrinthe:', data.orderNumber)
 
       return {
         success: true,
-        reference: labyrinthRef,
-        orderNumber: labyrinthRef,
+        reference: data.orderNumber,
+        orderNumber: data.orderNumber,
         message: data.message,
       }
     }

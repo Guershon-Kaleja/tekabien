@@ -2,7 +2,8 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://tekabien.vercel.app',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -16,6 +17,21 @@ serve(async (req) => {
   }
 
   try {
+    // Vérifier le secret webhook depuis l'URL
+    const url = new URL(req.url)
+    const secret = url.searchParams.get('secret')
+    const expectedSecret = Deno.env.get('WEBHOOK_SECRET')
+
+    if (!secret || secret !== expectedSecret) {
+      console.log('❌ Secret invalide:', secret)
+      return new Response(JSON.stringify({ error: 'Non autorisé' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      })
+    }
+
+    console.log('✅ Secret valide')
+
     const rawBody = await req.text()
     console.log('Raw body:', rawBody)
 
@@ -60,7 +76,6 @@ serve(async (req) => {
 
     if (payment && payment.status === 'pending' && statusCode === 2) {
 
-      // Marquer comme completed IMMÉDIATEMENT pour éviter double activation
       await supabase
         .from('payments')
         .update({ status: 'completed', order_number: orderNumber })
@@ -72,7 +87,6 @@ serve(async (req) => {
         .eq('id', payment.user_id)
         .single()
 
-      // Calculer la date d'expiration — 30 jours fixes
       const now = new Date()
       const currentExpires = currentUser?.plan_expires ? new Date(currentUser.plan_expires) : null
       const baseDate = currentExpires && currentExpires > now ? currentExpires : now
