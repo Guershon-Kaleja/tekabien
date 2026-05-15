@@ -753,16 +753,18 @@ export default function Ventes() {
                 type="date"
                 value={historyCustomStart}
                 onChange={(e) => setHistoryCustomStart(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB]"
+                style={{ WebkitAppearance: 'none', width: '100%', boxSizing: 'border-box' }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
               />
             </div>
             <div className="mb-6">
               <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
-              <input
+             <input
                 type="date"
                 value={historyCustomEnd}
                 onChange={(e) => setHistoryCustomEnd(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB]"
+                style={{ WebkitAppearance: 'none', width: '100%', boxSizing: 'border-box' }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-4 text-base outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
               />
             </div>
             <button
