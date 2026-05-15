@@ -13,8 +13,26 @@ export default function Login() {
     shop_name: '',
     phone: '',
     email: '',
-    password: ''
+    password: '',
+    confirm_password: '',
   })
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+  const normalizePhone = (phone) => {
+    const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+    if (clean.length === 9 && !clean.startsWith('0')) return '0' + clean
+    return clean
+  }
+
+  const validatePhone = (phone) => {
+    if (!phone) return true // optionnel
+    const clean = normalizePhone(phone)
+    if (!/^\d+$/.test(phone.replace(/\s/g, '').replace('+', ''))) return false
+    if (clean.length !== 10) return false
+    if (!/^0(7|8|9)\d{8}$/.test(clean)) return false
+    return true
+  }
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value })
@@ -26,33 +44,50 @@ export default function Login() {
       setError('Le nom de ta boutique doit avoir au moins 2 caractères')
       return
     }
+
+    if (!form.email || !emailRegex.test(form.email)) {
+      setError('Entre une adresse email valide (ex: nom@gmail.com)')
+      return
+    }
+
+    if (form.phone && !validatePhone(form.phone)) {
+      setError('Numéro invalide — doit commencer par 07x, 08x ou 09x et avoir 10 chiffres')
+      return
+    }
+
     if (!form.password || form.password.length < 6) {
       setError('Le mot de passe doit avoir au moins 6 caractères')
       return
     }
-    if (!form.email) {
-      setError('Donne ton adresse email')
+
+    if (form.password !== form.confirm_password) {
+      setError('Les mots de passe ne correspondent pas')
       return
     }
 
     setLoading(true)
 
     const { data, error } = await supabase.auth.signUp({
-      email: form.email,
+      email: form.email.trim().toLowerCase(),
       password: form.password,
     })
 
     if (error) {
-      setError(error.message)
+      if (error.message.includes('already registered')) {
+        setError('Cet email est déjà utilisé — connecte-toi')
+      } else {
+        setError(error.message)
+      }
       setLoading(false)
       return
     }
 
     if (data.user) {
+      const normalizedPhone = form.phone ? normalizePhone(form.phone) : ''
       await supabase.from('users').insert({
         id: data.user.id,
         shop_name: sanitize(form.shop_name),
-        phone: sanitize(form.phone),
+        phone: sanitize(normalizedPhone),
         language: 'fr',
         role: 'user',
         plan: 'trial',
@@ -64,13 +99,17 @@ export default function Login() {
   }
 
   const handleLogin = async () => {
-    if (!form.email || !form.password) {
-      setError('Remplis ton email et ton mot de passe')
+    if (!form.email || !emailRegex.test(form.email)) {
+      setError('Entre une adresse email valide')
+      return
+    }
+    if (!form.password) {
+      setError('Entre ton mot de passe')
       return
     }
     setLoading(true)
     const { error } = await supabase.auth.signInWithPassword({
-      email: form.email,
+      email: form.email.trim().toLowerCase(),
       password: form.password,
     })
     if (error) {
@@ -80,12 +119,12 @@ export default function Login() {
   }
 
   const handleForgotPassword = async () => {
-    if (!form.email) {
-      setError('Entre ton email')
+    if (!form.email || !emailRegex.test(form.email)) {
+      setError('Entre une adresse email valide')
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(form.email.trim().toLowerCase(), {
       redirectTo: `${window.location.origin}/reset-password`
     })
     if (error) {
@@ -175,7 +214,7 @@ export default function Login() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Nom de ta boutique
+                  Nom de ta boutique *
                 </label>
                 <input
                   name="shop_name"
@@ -187,19 +226,20 @@ export default function Login() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Numéro de téléphone
+                  Numéro de téléphone (optionnel)
                 </label>
                 <input
                   name="phone"
                   value={form.phone}
                   onChange={handleChange}
-                  placeholder="+243 8X XXX XXXX"
+                  placeholder="Ex: 0891234567"
                   className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
                 />
+                <p className="text-xs text-[#64748B] mt-1">Airtel, Orange, M-Pesa ou Africell</p>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Email
+                  Email *
                 </label>
                 <input
                   name="email"
@@ -211,7 +251,7 @@ export default function Login() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Mot de passe
+                  Mot de passe *
                 </label>
                 <input
                   name="password"
@@ -222,6 +262,29 @@ export default function Login() {
                   className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                  Confirmer le mot de passe *
+                </label>
+                <input
+                  name="confirm_password"
+                  type="password"
+                  value={form.confirm_password}
+                  onChange={handleChange}
+                  placeholder="Répète ton mot de passe"
+                  className={`w-full border rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] ${
+                    form.confirm_password && form.password !== form.confirm_password
+                      ? 'border-[#DC2626]'
+                      : 'border-gray-200'
+                  }`}
+                />
+                {form.confirm_password && form.password !== form.confirm_password && (
+                  <p className="text-xs text-[#DC2626] mt-1">Les mots de passe ne correspondent pas</p>
+                )}
+                {form.confirm_password && form.password === form.confirm_password && form.confirm_password.length >= 6 && (
+                  <p className="text-xs text-[#16A34A] mt-1">✅ Les mots de passe correspondent</p>
+                )}
+              </div>
             </div>
 
             <button
@@ -231,6 +294,13 @@ export default function Login() {
             >
               {loading ? 'Création...' : 'Créer mon compte gratuit'}
             </button>
+
+            <p className="text-center text-xs text-[#64748B] mt-4">
+              Déjà un compte ?{' '}
+              <span onClick={() => setTab('login')} className="text-[#1A56DB] font-medium cursor-pointer">
+                Se connecter
+              </span>
+            </p>
           </div>
         )}
 
@@ -290,10 +360,7 @@ export default function Login() {
 
             <p className="text-center text-xs text-[#64748B] mt-4">
               Pas encore de compte ?{' '}
-              <span
-                onClick={() => setTab('signup')}
-                className="text-[#1A56DB] font-medium cursor-pointer"
-              >
+              <span onClick={() => setTab('signup')} className="text-[#1A56DB] font-medium cursor-pointer">
                 S'inscrire gratuitement
               </span>
             </p>
