@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -43,12 +43,6 @@ export default function Rapports() {
     } else if (period === 'month') {
       start.setDate(1)
       start.setHours(0, 0, 0, 0)
-    } else if (period === 'lastmonth') {
-      start.setMonth(start.getMonth() - 1)
-      start.setDate(1)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(0)
-      end.setHours(23, 59, 59, 999)
     } else if (period === 'custom') {
       return {
         start: customStart ? new Date(customStart).toISOString() : new Date().toISOString(),
@@ -91,7 +85,6 @@ export default function Rapports() {
       const netProfit = totalSales - totalCost - totalExpenses
       const creditAmount = credits.reduce((sum, s) => sum + s.total, 0)
 
-      // Top produits
       const productMap = {}
       encaissees.forEach(s => {
         if (!productMap[s.product_name]) {
@@ -105,7 +98,6 @@ export default function Rapports() {
         .sort((a, b) => b.margin - a.margin)
         .slice(0, 5)
 
-      // Modes de paiement
       const paymentMap = {}
       encaissees.forEach(s => {
         if (!paymentMap[s.payment_method]) paymentMap[s.payment_method] = 0
@@ -115,7 +107,6 @@ export default function Rapports() {
         .map(([method, total]) => ({ method, total }))
         .sort((a, b) => b.total - a.total)
 
-      // Ventes par jour pour le graphique
       const dayMap = {}
       encaissees.forEach(s => {
         const day = new Date(s.created_at).toLocaleDateString('fr-FR', {
@@ -177,7 +168,6 @@ export default function Rapports() {
     if (period === 'today') return "Aujourd'hui"
     if (period === 'week') return '7 derniers jours'
     if (period === 'month') return 'Ce mois'
-    if (period === 'lastmonth') return 'Mois précédent'
     if (period === 'custom' && customStart) {
       return customEnd && customEnd !== customStart
         ? `${new Date(customStart).toLocaleDateString('fr-FR')} → ${new Date(customEnd).toLocaleDateString('fr-FR')}`
@@ -219,21 +209,24 @@ export default function Rapports() {
       <div className="px-4 pt-4">
 
         {/* Filtres période */}
-        <div className="flex gap-2 mb-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
           {[
             { id: 'today', label: "Auj." },
             { id: 'week', label: '7 jours' },
             { id: 'month', label: 'Ce mois' },
-            { id: 'lastmonth', label: 'Mois préc.' },
             { id: 'custom', label: '📅 Date' },
           ].map((p) => (
             <button
               key={p.id}
               onClick={() => {
                 setPeriod(p.id)
-                if (p.id === 'custom') setShowCustom(true)
+                if (p.id === 'custom') {
+                  setShowCustom(true)
+                } else {
+                  setShowCustom(false)
+                }
               }}
-              className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-medium border transition-all ${
                 period === p.id
                   ? 'bg-[#1A56DB] text-white border-[#1A56DB]'
                   : 'bg-white text-[#64748B] border-gray-200'
@@ -246,40 +239,44 @@ export default function Rapports() {
 
         {/* Sélecteur date personnalisée */}
         {showCustom && (
-          <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-              Choisir une période
+          <div className="bg-white rounded-xl border border-[#1A56DB] p-4 mb-4">
+            <p className="text-xs font-semibold text-[#1A56DB] uppercase tracking-wide mb-4">
+              📅 Choisir une période
             </p>
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            <div className="space-y-3 mb-4">
               <div>
-                <label className="block text-xs text-[#64748B] mb-1">Du</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                  Du
+                </label>
                 <input
                   type="date"
                   value={customStart}
                   onChange={(e) => setCustomStart(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#1A56DB]"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
                 />
               </div>
               <div>
-                <label className="block text-xs text-[#64748B] mb-1">Au</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                  Au
+                </label>
                 <input
                   type="date"
                   value={customEnd}
                   onChange={(e) => setCustomEnd(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#1A56DB]"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleCustomSearch}
-                className="flex-1 bg-[#1A56DB] text-white rounded-xl py-2.5 text-sm font-semibold"
+                className="flex-1 bg-[#1A56DB] text-white rounded-xl py-3 text-sm font-semibold"
               >
                 Voir les stats
               </button>
               <button
                 onClick={() => { setShowCustom(false); setPeriod('today') }}
-                className="px-4 bg-white border border-gray-200 text-[#64748B] rounded-xl py-2.5 text-sm"
+                className="px-4 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 text-sm font-medium"
               >
                 Annuler
               </button>
