@@ -16,6 +16,8 @@ export default function Rapports() {
     salesCount: 0,
     totalExpenses: 0,
     netProfit: 0,
+    creditPending: 0,
+    creditAmount: 0,
     topProducts: [],
     paymentMethods: [],
   })
@@ -49,13 +51,20 @@ export default function Rapports() {
       .gte('created_at', since)
 
     if (salesData && expensesData) {
-      const totalSales = salesData.reduce((sum, s) => sum + s.total, 0)
-      const totalCost = salesData.reduce((sum, s) => sum + (s.cost || 0), 0)
+      // Séparer ventes encaissées et crédit en attente
+      const encaissees = salesData.filter(s => s.encaissee !== false)
+      const credits = salesData.filter(s => s.encaissee === false)
+
+      const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
+      const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
       const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
       const netProfit = totalSales - totalCost - totalExpenses
 
+      const creditAmount = credits.reduce((sum, s) => sum + s.total, 0)
+
+      // Top produits — uniquement ventes encaissées
       const productMap = {}
-      salesData.forEach(s => {
+      encaissees.forEach(s => {
         if (!productMap[s.product_name]) {
           productMap[s.product_name] = { name: s.product_name, total: 0, margin: 0, count: 0 }
         }
@@ -67,8 +76,9 @@ export default function Rapports() {
         .sort((a, b) => b.margin - a.margin)
         .slice(0, 5)
 
+      // Modes de paiement — uniquement ventes encaissées
       const paymentMap = {}
-      salesData.forEach(s => {
+      encaissees.forEach(s => {
         if (!paymentMap[s.payment_method]) paymentMap[s.payment_method] = 0
         paymentMap[s.payment_method] += s.total
       })
@@ -79,9 +89,11 @@ export default function Rapports() {
       setStats({
         totalSales,
         totalCost,
-        salesCount: salesData.length,
+        salesCount: encaissees.length,
         totalExpenses,
         netProfit,
+        creditPending: credits.length,
+        creditAmount,
         topProducts,
         paymentMethods,
       })
@@ -119,7 +131,7 @@ export default function Rapports() {
           </p>
           <div className="grid grid-cols-3 gap-2 mt-3">
             <div className="bg-white/10 rounded-lg p-2 text-center">
-              <p className="text-blue-200 text-xs mb-1">Ventes</p>
+              <p className="text-blue-200 text-xs mb-1">Encaissé</p>
               <p className="text-white font-bold text-sm">{formatFC(stats.totalSales)}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-2 text-center">
@@ -160,6 +172,26 @@ export default function Rapports() {
           <p className="text-center text-[#64748B] text-sm py-8">Chargement...</p>
         ) : (
           <>
+            {/* Ventes crédit en attente */}
+            {stats.creditPending > 0 && (
+              <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-[#B45309]">
+                    ⏳ {stats.creditPending} vente{stats.creditPending > 1 ? 's' : ''} crédit en attente
+                  </p>
+                  <p className="text-xs text-[#64748B] mt-0.5">
+                    Non comptabilisées — {formatFC(stats.creditAmount)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/clients')}
+                  className="text-xs text-[#B45309] font-medium bg-yellow-100 px-3 py-1.5 rounded-lg"
+                >
+                  Voir clients
+                </button>
+              </div>
+            )}
+
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Top produits (par marge)
             </p>
@@ -167,7 +199,7 @@ export default function Rapports() {
             {stats.topProducts.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center mb-4">
                 <p className="text-3xl mb-2">📦</p>
-                <p className="text-sm font-semibold text-[#0F172A]">Aucune vente</p>
+                <p className="text-sm font-semibold text-[#0F172A]">Aucune vente encaissée</p>
                 <p className="text-xs text-[#64748B] mt-1">Enregistre des ventes pour voir les stats</p>
               </div>
             ) : (
