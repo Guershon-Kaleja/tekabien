@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { validateClient, validateDebt, sanitize } from '../lib/validation'
+import { validateClient, sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
@@ -14,13 +14,27 @@ export default function Clients() {
   const [filter, setFilter] = useState('tous')
   const [userId, setUserId] = useState(null)
   const [userPlan, setUserPlan] = useState('free')
+
+  // Modals
   const [showForm, setShowForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
   const [showDebtForm, setShowDebtForm] = useState(false)
+  const [showPayForm, setShowPayForm] = useState(false)
+  const [showEditDebt, setShowEditDebt] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+
   const [selectedClient, setSelectedClient] = useState(null)
   const [form, setForm] = useState({ name: '', phone: '' })
+  const [editForm, setEditForm] = useState({ name: '', phone: '' })
   const [debtForm, setDebtForm] = useState({ amount: '', note: '' })
+  const [payForm, setPayForm] = useState({ amount: '', note: '' })
+  const [editDebtAmount, setEditDebtAmount] = useState('')
+  const [debtHistory, setDebtHistory] = useState([])
+
   const [formErrors, setFormErrors] = useState({})
+  const [editErrors, setEditErrors] = useState({})
   const [debtErrors, setDebtErrors] = useState({})
+  const [payErrors, setPayErrors] = useState({})
 
   useEffect(() => { fetchClients() }, [])
 
@@ -30,47 +44,38 @@ export default function Clients() {
     setUserId(user.id)
 
     const { data: userData } = await supabase
-      .from('users')
-      .select('plan')
-      .eq('id', user.id)
-      .single()
+      .from('users').select('plan').eq('id', user.id).single()
     if (userData) setUserPlan(userData.plan)
 
     const { data } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name')
+      .from('customers').select('*').eq('user_id', user.id).order('name')
     if (data) setClients(data)
     setLoading(false)
   }
 
+  const fetchDebtHistory = async (client) => {
+    const { data } = await supabase
+      .from('debt_payments')
+      .select('*')
+      .eq('customer_id', client.id)
+      .order('created_at', { ascending: false })
+    if (data) setDebtHistory(data)
+  }
+
   const normalizePhone = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-    if (clean.length === 9 && !clean.startsWith('0')) {
-      return '0' + clean
-    }
+    if (clean.length === 9 && !clean.startsWith('0')) return '0' + clean
     return clean
   }
 
   const handleAddClient = async () => {
     if (!canAddClient(userPlan, clients.length)) {
-      setFormErrors({
-        name: `Limite atteinte — ton plan permet ${getPlanLimits(userPlan).maxClients} clients max. Passe au Pro pour continuer.`
-      })
+      setFormErrors({ name: `Limite atteinte — ${getPlanLimits(userPlan).maxClients} clients max. Passe au Pro.` })
       return
     }
-
-    const normalizedForm = {
-      ...form,
-      phone: form.phone ? normalizePhone(form.phone) : ''
-    }
-
+    const normalizedForm = { ...form, phone: form.phone ? normalizePhone(form.phone) : '' }
     const errors = validateClient(normalizedForm)
-    if (Object.keys(errors).length > 0) {
-      setFormErrors(errors)
-      return
-    }
+    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
     setFormErrors({})
 
     const { error } = await supabase.from('customers').insert({
@@ -78,6 +83,7 @@ export default function Clients() {
       name: sanitize(normalizedForm.name),
       phone: sanitize(normalizedForm.phone),
       total_debt: 0,
+      total_paid: 0,
     })
     if (!error) {
       setShowForm(false)
@@ -86,26 +92,42 @@ export default function Clients() {
     }
   }
 
+  const handleEditClient = async () => {
+    const normalizedForm = { ...editForm, phone: editForm.phone ? normalizePhone(editForm.phone) : '' }
+    const errors = validateClient(normalizedForm)
+    if (Object.keys(errors).length > 0) { setEditErrors(errors); return }
+    setEditErrors({})
+
+    const { error } = await supabase
+      .from('customers')
+      .update({
+        name: sanitize(normalizedForm.name),
+        phone: sanitize(normalizedForm.phone),
+      })
+      .eq('id', selectedClient.id)
+
+    if (!error) {
+      setShowEditForm(false)
+      setSelectedClient(null)
+      fetchClients()
+    }
+  }
+
   const handleAddDebt = async () => {
-    const errors = validateDebt(debtForm)
-    if (Object.keys(errors).length > 0) {
-      setDebtErrors(errors)
-      return
+    if (!debtForm.amount || parseFloat(debtForm.amount) <= 0) {
+      setDebtErrors({ amount: 'Le montant doit être supérieur à 0' }); return
     }
     setDebtErrors({})
-
     const amount = parseFloat(debtForm.amount)
+
     const { error } = await supabase.from('debts').insert({
       user_id: userId,
       customer_id: selectedClient.id,
-      amount,
-      paid: 0,
-      status: 'pending',
+      amount, paid: 0, status: 'pending',
       note: sanitize(debtForm.note),
     })
     if (!error) {
-      await supabase
-        .from('customers')
+      await supabase.from('customers')
         .update({ total_debt: selectedClient.total_debt + amount })
         .eq('id', selectedClient.id)
       setShowDebtForm(false)
@@ -114,26 +136,84 @@ export default function Clients() {
     }
   }
 
- const handlePaid = async (client) => {
-  // Marquer les dettes comme payées
-    await supabase
-      .from('customers')
-      .update({ total_debt: 0 })
+  const handleEditDebt = async () => {
+    if (!editDebtAmount || parseFloat(editDebtAmount) < 0) return
+    const newAmount = parseFloat(editDebtAmount)
+
+    await supabase.from('customers')
+      .update({ total_debt: newAmount })
+      .eq('id', selectedClient.id)
+
+    setShowEditDebt(false)
+    setEditDebtAmount('')
+    fetchClients()
+  }
+
+  const handlePartialPay = async () => {
+    const amount = parseFloat(payForm.amount)
+    if (!amount || amount <= 0) {
+      setPayErrors({ amount: 'Le montant doit être supérieur à 0' }); return
+    }
+    if (amount > selectedClient.total_debt) {
+      setPayErrors({ amount: `Le montant ne peut pas dépasser la dette (${formatFC(selectedClient.total_debt)})` }); return
+    }
+    setPayErrors({})
+
+    const newDebt = selectedClient.total_debt - amount
+    const newPaid = (selectedClient.total_paid || 0) + amount
+
+    // Enregistrer le remboursement
+    await supabase.from('debt_payments').insert({
+      user_id: userId,
+      customer_id: selectedClient.id,
+      amount,
+      note: sanitize(payForm.note) || 'Remboursement partiel',
+    })
+
+    // Mettre à jour la dette
+    await supabase.from('customers')
+      .update({ total_debt: newDebt, total_paid: newPaid })
+      .eq('id', selectedClient.id)
+
+    // Si dette soldée → comptabiliser les ventes crédit
+    if (newDebt === 0) {
+      await supabase.from('sales')
+        .update({ encaissee: true })
+        .eq('customer_id', selectedClient.id)
+        .eq('payment_method', 'credit')
+        .eq('encaissee', false)
+
+      await supabase.from('debts')
+        .update({ status: 'paid', paid: selectedClient.total_debt })
+        .eq('customer_id', selectedClient.id)
+        .eq('status', 'pending')
+    }
+
+    setShowPayForm(false)
+    setPayForm({ amount: '', note: '' })
+    fetchClients()
+  }
+
+  const handleFullPay = async (client) => {
+    await supabase.from('debt_payments').insert({
+      user_id: userId,
+      customer_id: client.id,
+      amount: client.total_debt,
+      note: 'Remboursement total',
+    })
+
+    await supabase.from('customers')
+      .update({ total_debt: 0, total_paid: (client.total_paid || 0) + client.total_debt })
       .eq('id', client.id)
 
-    await supabase
-      .from('debts')
+    await supabase.from('debts')
       .update({ status: 'paid', paid: client.total_debt })
-      .eq('customer_id', client.id)
-      .eq('status', 'pending')
+      .eq('customer_id', client.id).eq('status', 'pending')
 
-    // Comptabiliser les ventes crédit de ce client
-    await supabase
-      .from('sales')
+    await supabase.from('sales')
       .update({ encaissee: true })
       .eq('customer_id', client.id)
-      .eq('payment_method', 'credit')
-      .eq('encaissee', false)
+      .eq('payment_method', 'credit').eq('encaissee', false)
 
     fetchClients()
   }
@@ -148,6 +228,10 @@ export default function Clients() {
 
   const formatFC = (amount) =>
     new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
+
+  const formatDate = (dateStr) =>
+    new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
+    ' à ' + new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   const totalDebt = clients.reduce((sum, c) => sum + c.total_debt, 0)
   const lateCount = clients.filter(c => c.total_debt > 0).length
@@ -240,34 +324,84 @@ export default function Clients() {
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#0F172A]">{c.name}</p>
                   <p className="text-xs text-[#64748B]">{c.phone || 'Pas de téléphone'}</p>
+                  {c.total_paid > 0 && (
+                    <p className="text-xs text-[#16A34A]">✓ {formatFC(c.total_paid)} déjà remboursé</p>
+                  )}
                 </div>
-                <div className="text-right">
+                <div className="flex flex-col items-end gap-1">
                   <p className={`text-base font-bold ${c.total_debt > 0 ? 'text-[#DC2626]' : 'text-[#16A34A]'}`}>
                     {formatFC(c.total_debt)}
                   </p>
                   <p className="text-xs text-[#64748B]">{c.total_debt > 0 ? 'doit' : 'À jour ✓'}</p>
                 </div>
               </div>
+
+              {/* Boutons d'action */}
+              <div className="flex gap-2 mb-2">
+                <button
+                  onClick={() => {
+                    setSelectedClient(c)
+                    setEditForm({ name: c.name, phone: c.phone || '' })
+                    setShowEditForm(true)
+                  }}
+                  className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                >
+                  ✏️ Modifier
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedClient(c)
+                    fetchDebtHistory(c)
+                    setShowHistory(true)
+                  }}
+                  className="flex-1 bg-[#F8FAFC] text-[#64748B] rounded-lg py-2 text-xs font-semibold border border-gray-200"
+                >
+                  📋 Historique
+                </button>
+              </div>
+
               {c.total_debt > 0 && (
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handlePaid(c)}
-                    className="flex-1 bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1"
+                    onClick={() => { setSelectedClient(c); setShowPayForm(true) }}
+                    className="flex-1 bg-[#FFFBEB] text-[#B45309] rounded-lg py-2 text-xs font-semibold border border-yellow-200"
                   >
-                    ✓ Remboursé
+                    💰 Paiement partiel
                   </button>
                   <button
-                    onClick={() => handleWhatsApp(c)}
-                    className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1"
+                    onClick={() => handleFullPay(c)}
+                    className="flex-1 bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold"
                   >
-                    💬 Rappel WhatsApp
+                    ✓ Tout remboursé
                   </button>
                 </div>
               )}
+
+              {c.total_debt > 0 && (
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      setSelectedClient(c)
+                      setEditDebtAmount(c.total_debt.toString())
+                      setShowEditDebt(true)
+                    }}
+                    className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-lg py-2 text-xs font-medium"
+                  >
+                    ✏️ Modifier dette
+                  </button>
+                  <button
+                    onClick={() => handleWhatsApp(c)}
+                    className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    💬 WhatsApp
+                  </button>
+                </div>
+              )}
+
               {c.total_debt === 0 && (
                 <button
                   onClick={() => { setSelectedClient(c); setShowDebtForm(true) }}
-                  className="w-full bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold"
+                  className="w-full bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold mt-1"
                 >
                   + Ajouter une dette
                 </button>
@@ -301,55 +435,69 @@ export default function Clients() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
-                  Nom du client
-                </label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom du client</label>
                 <input
                   value={form.name}
-                  onChange={(e) => {
-                    setForm({ ...form, name: e.target.value })
-                    if (formErrors.name) setFormErrors({ ...formErrors, name: null })
-                  }}
+                  onChange={(e) => { setForm({ ...form, name: e.target.value }); setFormErrors({ ...formErrors, name: null }) }}
                   placeholder="Ex: Mama Mutombo"
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${
-                    formErrors.name ? 'border-[#DC2626]' : 'border-gray-200'
-                  }`}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${formErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
-                {formErrors.name && (
-                  <p className="text-xs text-[#DC2626] mt-1">{formErrors.name}</p>
-                )}
+                {formErrors.name && <p className="text-xs text-[#DC2626] mt-1">{formErrors.name}</p>}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
-                  Téléphone
-                </label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Téléphone</label>
                 <input
                   value={form.phone}
-                  onChange={(e) => {
-                    setForm({ ...form, phone: e.target.value })
-                    if (formErrors.phone) setFormErrors({ ...formErrors, phone: null })
-                  }}
-                  placeholder="Ex: 0891234567 ou 891234567"
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${
-                    formErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'
-                  }`}
+                  onChange={(e) => { setForm({ ...form, phone: e.target.value }); setFormErrors({ ...formErrors, phone: null }) }}
+                  placeholder="Ex: 0891234567"
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${formErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
-                {formErrors.phone && (
-                  <p className="text-xs text-[#DC2626] mt-1">{formErrors.phone}</p>
-                )}
+                {formErrors.phone && <p className="text-xs text-[#DC2626] mt-1">{formErrors.phone}</p>}
               </div>
             </div>
-            <button
-              onClick={handleAddClient}
-              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4"
-            >
+            <button onClick={handleAddClient} className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4">
               Ajouter le client
             </button>
           </div>
         </div>
       )}
 
-      {/* Modal ajout dette */}
+      {/* Modal modifier client */}
+      {showEditForm && selectedClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-[#0F172A]">Modifier — {selectedClient.name}</h2>
+              <button onClick={() => { setShowEditForm(false); setEditErrors({}) }} className="text-[#64748B] text-xl">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom</label>
+                <input
+                  value={editForm.name}
+                  onChange={(e) => { setEditForm({ ...editForm, name: e.target.value }); setEditErrors({ ...editErrors, name: null }) }}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${editErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
+                />
+                {editErrors.name && <p className="text-xs text-[#DC2626] mt-1">{editErrors.name}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Téléphone</label>
+                <input
+                  value={editForm.phone}
+                  onChange={(e) => { setEditForm({ ...editForm, phone: e.target.value }); setEditErrors({ ...editErrors, phone: null }) }}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${editErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'}`}
+                />
+                {editErrors.phone && <p className="text-xs text-[#DC2626] mt-1">{editErrors.phone}</p>}
+              </div>
+            </div>
+            <button onClick={handleEditClient} className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4">
+              Enregistrer les modifications
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ajouter dette */}
       {showDebtForm && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -359,29 +507,18 @@ export default function Clients() {
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
-                  Montant (FC)
-                </label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant (FC)</label>
                 <input
                   type="number"
                   value={debtForm.amount}
-                  onChange={(e) => {
-                    setDebtForm({ ...debtForm, amount: e.target.value })
-                    if (debtErrors.amount) setDebtErrors({ ...debtErrors, amount: null })
-                  }}
+                  onChange={(e) => { setDebtForm({ ...debtForm, amount: e.target.value }); setDebtErrors({ ...debtErrors, amount: null }) }}
                   placeholder="Ex: 5000"
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${
-                    debtErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'
-                  }`}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${debtErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
-                {debtErrors.amount && (
-                  <p className="text-xs text-[#DC2626] mt-1">{debtErrors.amount}</p>
-                )}
+                {debtErrors.amount && <p className="text-xs text-[#DC2626] mt-1">{debtErrors.amount}</p>}
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
-                  Note (optionnel)
-                </label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Note (optionnel)</label>
                 <input
                   value={debtForm.note}
                   onChange={(e) => setDebtForm({ ...debtForm, note: e.target.value })}
@@ -390,12 +527,139 @@ export default function Clients() {
                 />
               </div>
             </div>
-            <button
-              onClick={handleAddDebt}
-              className="w-full bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm mt-4"
-            >
+            <button onClick={handleAddDebt} className="w-full bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm mt-4">
               Enregistrer la dette
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal modifier montant dette */}
+      {showEditDebt && selectedClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-[#0F172A]">Modifier dette — {selectedClient.name}</h2>
+              <button onClick={() => setShowEditDebt(false)} className="text-[#64748B] text-xl">✕</button>
+            </div>
+            <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4">
+              <p className="text-xs text-[#B45309]">⚠️ Dette actuelle : <span className="font-bold">{formatFC(selectedClient.total_debt)}</span></p>
+              <p className="text-xs text-[#64748B] mt-1">Modifie uniquement pour corriger une erreur.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nouveau montant (FC)</label>
+              <input
+                type="number"
+                value={editDebtAmount}
+                onChange={(e) => setEditDebtAmount(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB]"
+              />
+            </div>
+            <button onClick={handleEditDebt} className="w-full bg-[#F5A623] text-white rounded-xl py-3 font-semibold text-sm mt-4">
+              Mettre à jour
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal paiement partiel */}
+      {showPayForm && selectedClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-[#0F172A]">Paiement — {selectedClient.name}</h2>
+              <button onClick={() => { setShowPayForm(false); setPayErrors({}) }} className="text-[#64748B] text-xl">✕</button>
+            </div>
+            <div className="bg-[#FEF2F2] border border-red-200 rounded-xl p-3 mb-4">
+              <p className="text-xs text-[#DC2626]">Dette restante : <span className="font-bold">{formatFC(selectedClient.total_debt)}</span></p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant remboursé (FC)</label>
+                <input
+                  type="number"
+                  value={payForm.amount}
+                  onChange={(e) => { setPayForm({ ...payForm, amount: e.target.value }); setPayErrors({ ...payErrors, amount: null }) }}
+                  placeholder={`Max: ${formatFC(selectedClient.total_debt)}`}
+                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${payErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'}`}
+                />
+                {payErrors.amount && <p className="text-xs text-[#DC2626] mt-1">{payErrors.amount}</p>}
+                {payForm.amount && parseFloat(payForm.amount) > 0 && parseFloat(payForm.amount) <= selectedClient.total_debt && (
+                  <p className="text-xs text-[#16A34A] mt-1">
+                    Reste après paiement : {formatFC(selectedClient.total_debt - parseFloat(payForm.amount))}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Note (optionnel)</label>
+                <input
+                  value={payForm.note}
+                  onChange={(e) => setPayForm({ ...payForm, note: e.target.value })}
+                  placeholder="Ex: Versement espèces"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB]"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handlePartialPay}
+                className="flex-1 bg-[#16A34A] text-white rounded-xl py-3 font-semibold text-sm"
+              >
+                Confirmer le paiement
+              </button>
+              <button
+                onClick={() => {
+                  setPayForm({ amount: selectedClient.total_debt.toString(), note: 'Remboursement total' })
+                }}
+                className="px-3 bg-[#F0FDF4] text-[#16A34A] rounded-xl py-3 text-xs font-semibold border border-green-200"
+              >
+                Tout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal historique remboursements */}
+      {showHistory && selectedClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+          <div className="bg-white rounded-t-2xl w-full p-5 max-h-[70vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-base font-bold text-[#0F172A]">{selectedClient.name}</h2>
+                <p className="text-xs text-[#64748B]">Historique des remboursements</p>
+              </div>
+              <button onClick={() => setShowHistory(false)} className="text-[#64748B] text-xl">✕</button>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4 flex justify-between">
+              <div>
+                <p className="text-xs text-[#64748B]">Dette actuelle</p>
+                <p className="text-base font-bold text-[#DC2626]">{formatFC(selectedClient.total_debt)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-[#64748B]">Total remboursé</p>
+                <p className="text-base font-bold text-[#16A34A]">{formatFC(selectedClient.total_paid || 0)}</p>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1">
+              {debtHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-3xl mb-2">📋</p>
+                  <p className="text-sm font-semibold text-[#0F172A]">Aucun remboursement</p>
+                  <p className="text-xs text-[#64748B] mt-1">Les remboursements apparaîtront ici</p>
+                </div>
+              ) : (
+                debtHistory.map((p) => (
+                  <div key={p.id} className="bg-white border border-gray-100 rounded-xl p-3 mb-2 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-[#0F172A]">{p.note || 'Remboursement'}</p>
+                      <p className="text-xs text-[#64748B]">{formatDate(p.created_at)}</p>
+                    </div>
+                    <p className="text-sm font-bold text-[#16A34A]">+{formatFC(p.amount)}</p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
