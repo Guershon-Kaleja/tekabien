@@ -26,7 +26,7 @@ export default function Login() {
   }
 
   const validatePhone = (phone) => {
-    if (!phone) return true // optionnel
+    if (!phone) return true
     const clean = normalizePhone(phone)
     if (!/^\d+$/.test(phone.replace(/\s/g, '').replace('+', ''))) return false
     if (clean.length !== 10) return false
@@ -93,7 +93,12 @@ export default function Login() {
         plan: 'trial',
         plan_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       })
-      navigate('/onboarding')
+
+      if (!data.session) {
+        setTab('confirm_email')
+      } else {
+        navigate('/onboarding')
+      }
     }
     setLoading(false)
   }
@@ -113,7 +118,11 @@ export default function Login() {
       password: form.password,
     })
     if (error) {
-      setError('Email ou mot de passe incorrect')
+      if (error.message.includes('Email not confirmed')) {
+        setError('Email non confirmé — vérifie ta boîte mail')
+      } else {
+        setError('Email ou mot de passe incorrect')
+      }
     }
     setLoading(false)
   }
@@ -136,25 +145,39 @@ export default function Login() {
     setLoading(false)
   }
 
+  const handleResendConfirmation = async () => {
+    setLoading(true)
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: form.email.trim().toLowerCase(),
+    })
+    if (!error) {
+      setSuccess(true)
+    }
+    setLoading(false)
+  }
+
   return (
     <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
 
-        <div className="flex border-b border-gray-100">
-          {['welcome', 'signup', 'login'].map((t) => (
-            <button
-              key={t}
-              onClick={() => { setTab(t); setError(''); setSuccess(false) }}
-              className={`flex-1 py-3 text-xs font-semibold transition-colors ${
-                tab === t
-                  ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
-                  : 'text-[#64748B]'
-              }`}
-            >
-              {t === 'welcome' ? 'Accueil' : t === 'signup' ? "S'inscrire" : 'Se connecter'}
-            </button>
-          ))}
-        </div>
+        {tab !== 'confirm_email' && (
+          <div className="flex border-b border-gray-100">
+            {['welcome', 'signup', 'login'].map((t) => (
+              <button
+                key={t}
+                onClick={() => { setTab(t); setError(''); setSuccess(false) }}
+                className={`flex-1 py-3 text-xs font-semibold transition-colors ${
+                  tab === t
+                    ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
+                    : 'text-[#64748B]'
+                }`}
+              >
+                {t === 'welcome' ? 'Accueil' : t === 'signup' ? "S'inscrire" : 'Se connecter'}
+              </button>
+            ))}
+          </div>
+        )}
 
         {tab === 'welcome' && (
           <div className="p-6 text-center">
@@ -299,6 +322,57 @@ export default function Login() {
               Déjà un compte ?{' '}
               <span onClick={() => setTab('login')} className="text-[#1A56DB] font-medium cursor-pointer">
                 Se connecter
+              </span>
+            </p>
+          </div>
+        )}
+
+        {tab === 'confirm_email' && (
+          <div className="p-6 text-center">
+            <div className="w-16 h-16 bg-[#EBF2FF] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-3xl">📧</span>
+            </div>
+            <h2 className="text-lg font-bold text-[#0F172A] mb-2">Vérifie ton email</h2>
+            <p className="text-sm text-[#64748B] leading-relaxed mb-4">
+              On a envoyé un lien de confirmation à{' '}
+              <span className="font-semibold text-[#0F172A]">{form.email}</span>.
+            </p>
+
+            <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-5 text-left">
+              <p className="text-xs font-semibold text-[#1A56DB] mb-2">Comment faire :</p>
+              <p className="text-xs text-[#64748B] mb-1">1. Ouvre ta boîte mail</p>
+              <p className="text-xs text-[#64748B] mb-1">2. Clique sur le lien de confirmation</p>
+              <p className="text-xs text-[#64748B]">3. Reviens ici pour te connecter</p>
+            </div>
+
+            {success && (
+              <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
+                <p className="text-xs text-[#16A34A] font-medium">✅ Email renvoyé !</p>
+              </div>
+            )}
+
+            <button
+              onClick={() => { setTab('login'); setSuccess(false) }}
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
+            >
+              Aller à la connexion
+            </button>
+
+            <button
+              onClick={handleResendConfirmation}
+              disabled={loading}
+              className="w-full bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm disabled:opacity-50"
+            >
+              {loading ? 'Envoi...' : "Renvoyer l'email de confirmation"}
+            </button>
+
+            <p className="text-xs text-[#64748B] mt-4">
+              Mauvais email ?{' '}
+              <span
+                onClick={() => { setTab('signup'); setSuccess(false) }}
+                className="text-[#1A56DB] font-medium cursor-pointer"
+              >
+                Recommencer
               </span>
             </p>
           </div>
