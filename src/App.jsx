@@ -19,6 +19,26 @@ function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [retrying, setRetrying] = useState(false)
+  const [retryFailed, setRetryFailed] = useState(false)
+
+  const handleRetry = async () => {
+    setRetrying(true)
+    setRetryFailed(false)
+    
+    // Tester la connexion réelle
+    try {
+      await fetch('https://www.google.com/favicon.ico', { 
+        mode: 'no-cors', 
+        cache: 'no-store' 
+      })
+      window.location.reload()
+    } catch {
+      setRetrying(false)
+      setRetryFailed(true)
+    }
+  }
+
 
   useAutoLogout()
 
@@ -75,11 +95,18 @@ function App() {
             Vérifie ton réseau Airtel, Orange, M-Pesa ou Africell et réessaie.
           </p>
           <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
-          >
-            🔄 Réessayer
+              onClick={handleRetry}
+              disabled={retrying}
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3 disabled:opacity-50"
+            >
+              {retrying ? '🔄 Vérification...' : '🔄 Réessayer'}
           </button>
+
+          {retryFailed && (
+              <p className="text-xs text-[#DC2626] font-medium mb-3">
+                Toujours pas de connexion — vérifie ton réseau
+              </p>
+          )}
           <p className="text-xs text-[#64748B]">
             Tes données sont sauvegardées — rien n'est perdu.
           </p>
