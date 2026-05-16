@@ -1,6 +1,6 @@
 export const PLAN_LIMITS = {
   free: {
-    maxSalesPerDay: 20,
+    maxSalesPerDay: 10,
     maxProducts: 5,
     maxClients: 3,
     canExportPDF: false,
