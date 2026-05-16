@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateProduct, sanitize } from '../lib/validation'
 import { canAddProduct, getPlanLimits } from '../lib/planLimits'
+import { setCache, getCache, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -28,27 +29,70 @@ export default function Stocks() {
   const [restock, setRestock] = useState(null)
   const [restockQty, setRestockQty] = useState('')
   const [restockError, setRestockError] = useState('')
+  const [online, setOnline] = useState(isOnline())
+  const [fromCache, setFromCache] = useState(false)
 
-  useEffect(() => { fetchProducts() }, [])
+  const { formatAmount, currency } = useCurrency()
+
+  useEffect(() => {
+    fetchProducts()
+
+    const handleOnline = () => {
+      setOnline(true)
+      fetchProducts()
+    }
+    const handleOffline = () => setOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
 
+    if (!isOnline()) {
+      // Charger depuis le cache
+      const cachedProducts = await getCache(`products_${user.id}`)
+      const cachedPlan = await getCache(`plan_${user.id}`)
+
+      if (cachedProducts) {
+        setProducts(cachedProducts)
+        setFromCache(true)
+      }
+      if (cachedPlan) setUserPlan(cachedPlan)
+      setLoading(false)
+      return
+    }
+
+    setFromCache(false)
+
     const { data: userData } = await supabase
       .from('users')
       .select('plan')
       .eq('id', user.id)
       .single()
-    if (userData) setUserPlan(userData.plan)
+    if (userData) {
+      setUserPlan(userData.plan)
+      await setCache(`plan_${user.id}`, userData.plan)
+    }
 
     const { data } = await supabase
       .from('products')
       .select('*')
       .eq('user_id', user.id)
       .order('name')
-    if (data) setProducts(data)
+
+    if (data) {
+      setProducts(data)
+      await setCache(`products_${user.id}`, data)
+    }
     setLoading(false)
   }
 
@@ -142,8 +186,6 @@ export default function Stocks() {
     }
   }
 
-  const { formatAmount, currency } = useCurrency()
-
   const totalValue = products.reduce((sum, p) => sum + p.price_sell * p.quantity, 0)
   const lowStockCount = products.filter(p => p.quantity <= p.alert_threshold).length
 
@@ -191,6 +233,19 @@ export default function Stocks() {
         </div>
       </div>
 
+      {/* Bannière offline */}
+      {!online && (
+        <div className="bg-[#FFFBEB] border-b border-yellow-200 px-4 py-2 flex items-center gap-2">
+          <span className="text-sm">📶</span>
+          <div className="flex-1">
+            <p className="text-xs text-[#B45309] font-medium">Mode hors ligne</p>
+            <p className="text-xs text-[#64748B]">
+              {fromCache ? 'Affichage des données en cache' : 'Aucune donnée disponible'}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="px-4 pt-4">
 
         <div className="bg-white rounded-xl border border-gray-200 px-3 py-3 flex items-center gap-2 mb-3">
@@ -225,7 +280,9 @@ export default function Stocks() {
           <div className="text-center py-8">
             <p className="text-3xl mb-2">📦</p>
             <p className="text-sm font-semibold text-[#0F172A]">Aucun produit</p>
-            <p className="text-xs text-[#64748B] mt-1">Ajoute ton premier produit</p>
+            <p className="text-xs text-[#64748B] mt-1">
+              {!online && !fromCache ? 'Connecte-toi pour voir tes produits' : 'Ajoute ton premier produit'}
+            </p>
           </div>
         ) : (
           filtered.map((p) => (
@@ -257,59 +314,63 @@ export default function Stocks() {
                 </div>
               </div>
 
-              {/* Boutons actions */}
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                <button
-                  onClick={() => {
-                    setRestock(p)
-                    setRestockQty('')
-                    setRestockError('')
-                  }}
-                  className="bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold"
-                >
-                  + Stock
-                </button>
-                <button
-                  onClick={() => {
-                    setEditProduct(p)
-                    setEditForm({
-                      name: p.name,
-                      price_sell: p.price_sell.toString(),
-                      price_buy: p.price_buy?.toString() || '0',
-                      quantity: p.quantity.toString(),
-                      alert_threshold: p.alert_threshold?.toString() || '5',
-                      category: p.category || 'alimentation',
-                    })
-                    setEditErrors({})
-                  }}
-                  className="bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
-                >
-                  ✏️ Modifier
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(p)}
-                  className="bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold"
-                >
-                  🗑️ Suppr.
-                </button>
-              </div>
+              {/* Boutons actions — désactivés en offline */}
+              {online ? (
+                <div className="grid grid-cols-3 gap-2 mt-3">
+                  <button
+                    onClick={() => { setRestock(p); setRestockQty(''); setRestockError('') }}
+                    className="bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    + Stock
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditProduct(p)
+                      setEditForm({
+                        name: p.name,
+                        price_sell: p.price_sell.toString(),
+                        price_buy: p.price_buy?.toString() || '0',
+                        quantity: p.quantity.toString(),
+                        alert_threshold: p.alert_threshold?.toString() || '5',
+                        category: p.category || 'alimentation',
+                      })
+                      setEditErrors({})
+                    }}
+                    className="bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(p)}
+                    className="bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    🗑️ Suppr.
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-[#64748B] mt-2 text-center">
+                  📶 Reconnecte-toi pour modifier
+                </p>
+              )}
             </div>
           ))
         )}
 
-        <button
-          onClick={() => setShowForm(true)}
-          className={`w-full border border-dashed rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 mt-2 ${
-            canAddProduct(userPlan, products.length)
-              ? 'border-[#1A56DB] text-[#1A56DB]'
-              : 'border-gray-300 text-[#64748B]'
-          }`}
-        >
-          {canAddProduct(userPlan, products.length)
-            ? '+ Ajouter un produit'
-            : `Limite atteinte (${getPlanLimits(userPlan).maxProducts} max) — Passe au Pro`
-          }
-        </button>
+        {online && (
+          <button
+            onClick={() => setShowForm(true)}
+            className={`w-full border border-dashed rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 mt-2 ${
+              canAddProduct(userPlan, products.length)
+                ? 'border-[#1A56DB] text-[#1A56DB]'
+                : 'border-gray-300 text-[#64748B]'
+            }`}
+          >
+            {canAddProduct(userPlan, products.length)
+              ? '+ Ajouter un produit'
+              : `Limite atteinte (${getPlanLimits(userPlan).maxProducts} max) — Passe au Pro`
+            }
+          </button>
+        )}
       </div>
 
       {/* Modal réapprovisionnement */}
@@ -320,7 +381,6 @@ export default function Stocks() {
               <h2 className="text-base font-bold text-[#0F172A]">Réapprovisionner</h2>
               <button onClick={() => setRestock(null)} className="text-[#64748B] text-xl">✕</button>
             </div>
-
             <div className="bg-[#EEF2F7] rounded-xl p-3 mb-4">
               <p className="text-xs text-[#64748B]">Produit</p>
               <p className="text-sm font-bold text-[#0F172A]">{restock.name}</p>
@@ -328,7 +388,6 @@ export default function Stocks() {
                 Stock actuel : <span className="font-semibold" style={{ color: getStockColor(restock) }}>{restock.quantity} unités</span>
               </p>
             </div>
-
             <div className="mb-4">
               <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
                 Quantité à ajouter
@@ -363,7 +422,6 @@ export default function Stocks() {
                 </p>
               )}
             </div>
-
             <button
               onClick={handleRestock}
               className="w-full bg-[#16A34A] text-white rounded-xl py-3 font-semibold text-sm"
@@ -380,12 +438,7 @@ export default function Stocks() {
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-[#0F172A]">Nouveau produit</h2>
-              <button
-                onClick={() => { setShowForm(false); setFormErrors({}) }}
-                className="text-[#64748B] text-xl"
-              >
-                ✕
-              </button>
+              <button onClick={() => { setShowForm(false); setFormErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
             <div className="space-y-3">
               {fields.map((f) => (
@@ -427,12 +480,7 @@ export default function Stocks() {
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-base font-bold text-[#0F172A]">Modifier — {editProduct.name}</h2>
-              <button
-                onClick={() => { setEditProduct(null); setEditErrors({}) }}
-                className="text-[#64748B] text-xl"
-              >
-                ✕
-              </button>
+              <button onClick={() => { setEditProduct(null); setEditErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
             <div className="space-y-3">
               {fields.map((f) => (

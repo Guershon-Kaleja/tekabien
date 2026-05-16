@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateExpense, sanitize } from '../lib/validation'
+import { saveExpenseOffline, getPendingExpenses, markExpenseSynced, setCache, getCache, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -20,6 +21,10 @@ export default function Depenses() {
   const [editForm, setEditForm] = useState({ category: 'marchandises', amount: '', note: '' })
   const [editErrors, setEditErrors] = useState({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+  const [online, setOnline] = useState(isOnline())
+  const [pendingCount, setPendingCount] = useState(0)
+
+  const { formatAmount, currency } = useCurrency()
 
   const categories = [
     { id: 'marchandises', label: 'Achat marchandises', icon: '🛍️' },
@@ -29,6 +34,24 @@ export default function Depenses() {
     { id: 'electricite', label: 'Électricité', icon: '💡' },
     { id: 'autre', label: 'Autre', icon: '📌' },
   ]
+
+  useEffect(() => {
+    fetchData()
+
+    const handleOnline = async () => {
+      setOnline(true)
+      await syncPendingExpenses()
+    }
+    const handleOffline = () => setOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   useEffect(() => { fetchData() }, [period])
 
@@ -41,10 +64,51 @@ export default function Depenses() {
     return start.toISOString()
   }
 
+  const syncPendingExpenses = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const pending = await getPendingExpenses(user.id)
+    if (pending.length === 0) return
+
+    for (const expense of pending) {
+      const { local_id, synced, ...expenseData } = expense
+      const { error } = await supabase.from('expenses').insert(expenseData)
+      if (!error) {
+        await markExpenseSynced(local_id)
+      }
+    }
+
+    setPendingCount(0)
+    fetchData()
+  }
+
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
+
+    const pending = await getPendingExpenses(user.id)
+    setPendingCount(pending.length)
+
+    if (!isOnline()) {
+      // Charger depuis le cache
+      const cachedExpenses = await getCache(`expenses_${user.id}_${period}`)
+      const cachedSales = await getCache(`sales_${user.id}_${period}`)
+
+      if (cachedExpenses) {
+        const allExpenses = [...cachedExpenses, ...pending.map(e => ({
+          ...e,
+          id: e.local_id,
+          isOffline: true,
+        }))]
+        setExpenses(allExpenses)
+      }
+      if (cachedSales) setSales(cachedSales)
+      setLoading(false)
+      return
+    }
+
     const since = getDateRange()
 
     const { data: expData } = await supabase
@@ -60,8 +124,14 @@ export default function Depenses() {
       .eq('user_id', user.id)
       .gte('created_at', since)
 
-    if (expData) setExpenses(expData)
-    if (salesData) setSales(salesData)
+    if (expData) {
+      setExpenses(expData)
+      await setCache(`expenses_${user.id}_${period}`, expData)
+    }
+    if (salesData) {
+      setSales(salesData)
+      await setCache(`sales_${user.id}_${period}`, salesData)
+    }
     setLoading(false)
   }
 
@@ -73,12 +143,31 @@ export default function Depenses() {
     }
     setFormErrors({})
 
-    const { error } = await supabase.from('expenses').insert({
+    const expenseData = {
       user_id: userId,
       category: form.category,
       amount: parseFloat(form.amount),
       note: sanitize(form.note),
-    })
+    }
+
+    if (!isOnline()) {
+      await saveExpenseOffline(expenseData)
+      setPendingCount(prev => prev + 1)
+
+      // Ajouter localement
+      setExpenses(prev => [{
+        ...expenseData,
+        id: `local_${Date.now()}`,
+        created_at: new Date().toISOString(),
+        isOffline: true,
+      }, ...prev])
+
+      setShowForm(false)
+      setForm({ category: 'marchandises', amount: '', note: '' })
+      return
+    }
+
+    const { error } = await supabase.from('expenses').insert(expenseData)
 
     if (!error) {
       setShowForm(false)
@@ -122,23 +211,16 @@ export default function Depenses() {
     }
   }
 
-  const { formatAmount } = useCurrency()
-
   const totalIncome = sales.reduce((sum, s) => sum + s.total, 0)
   const totalCost = sales.reduce((sum, s) => sum + (s.cost || 0), 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
   const netProfit = totalIncome - totalCost - totalExpenses
 
-  const getCategoryIcon = (cat) =>
-    categories.find(c => c.id === cat)?.icon || '📌'
-
-  const getCategoryLabel = (cat) =>
-    categories.find(c => c.id === cat)?.label || cat
+  const getCategoryIcon = (cat) => categories.find(c => c.id === cat)?.icon || '📌'
+  const getCategoryLabel = (cat) => categories.find(c => c.id === cat)?.label || cat
 
   const formatDate = (dateStr) =>
-    new Date(dateStr).toLocaleTimeString('fr-FR', {
-      hour: '2-digit', minute: '2-digit'
-    })
+    new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   const CategoryGrid = ({ value, onChange }) => (
     <div className="grid grid-cols-3 gap-2">
@@ -189,6 +271,29 @@ export default function Depenses() {
         </div>
       </div>
 
+      {/* Bannière offline */}
+      {!online ? (
+        <div className="bg-[#FFFBEB] border-b border-yellow-200 px-4 py-2 flex items-center gap-2">
+          <span className="text-sm">📶</span>
+          <div className="flex-1">
+            <p className="text-xs text-[#B45309] font-medium">Mode hors ligne</p>
+            <p className="text-xs text-[#64748B]">Les dépenses seront synchronisées au retour du réseau</p>
+          </div>
+          {pendingCount > 0 && (
+            <span className="text-xs font-bold bg-[#F5A623] text-white px-2 py-1 rounded-full">
+              {pendingCount} en attente
+            </span>
+          )}
+        </div>
+      ) : pendingCount > 0 ? (
+        <div className="bg-[#EBF2FF] border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+          <span className="text-sm">🔄</span>
+          <p className="text-xs text-[#1A56DB] font-medium">
+            {pendingCount} dépense{pendingCount > 1 ? 's' : ''} en cours de synchronisation...
+          </p>
+        </div>
+      ) : null}
+
       <div className="px-4 pt-4">
 
         <div className="flex gap-2 mb-4">
@@ -225,13 +330,24 @@ export default function Depenses() {
           </div>
         ) : (
           expenses.map((e) => (
-            <div key={e.id} className="bg-white rounded-xl border border-gray-200 p-3 mb-2">
+            <div
+              key={e.id}
+              className="bg-white rounded-xl border border-gray-200 p-3 mb-2"
+              style={{ borderLeft: e.isOffline ? '3px solid #F5A623' : '3px solid #DC2626' }}
+            >
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-red-50 rounded-xl flex items-center justify-center flex-shrink-0">
                   <span className="text-lg">{getCategoryIcon(e.category)}</span>
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-semibold text-[#0F172A]">{getCategoryLabel(e.category)}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-[#0F172A]">{getCategoryLabel(e.category)}</p>
+                    {e.isOffline && (
+                      <span className="text-xs bg-[#FFFBEB] text-[#B45309] px-1.5 py-0.5 rounded-full font-medium">
+                        ⏳ En attente
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-[#64748B]">
                     {e.note || 'Aucune note'} · {formatDate(e.created_at)}
                   </p>
@@ -239,28 +355,30 @@ export default function Depenses() {
                 <span className="text-sm font-bold text-[#DC2626]">- {formatAmount(e.amount)}</span>
               </div>
 
-              <div className="flex gap-2 mt-3">
-                <button
-                  onClick={() => {
-                    setEditExpense(e)
-                    setEditForm({
-                      category: e.category,
-                      amount: e.amount.toString(),
-                      note: e.note || '',
-                    })
-                    setEditErrors({})
-                  }}
-                  className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
-                >
-                  ✏️ Modifier
-                </button>
-                <button
-                  onClick={() => setShowDeleteConfirm(e)}
-                  className="flex-1 bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold"
-                >
-                  🗑️ Supprimer
-                </button>
-              </div>
+              {!e.isOffline && (
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => {
+                      setEditExpense(e)
+                      setEditForm({
+                        category: e.category,
+                        amount: e.amount.toString(),
+                        note: e.note || '',
+                      })
+                      setEditErrors({})
+                    }}
+                    className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    ✏️ Modifier
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteConfirm(e)}
+                    className="flex-1 bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold"
+                  >
+                    🗑️ Supprimer
+                  </button>
+                </div>
+              )}
             </div>
           ))
         )}
@@ -274,6 +392,7 @@ export default function Depenses() {
 
       </div>
 
+      {/* Modal ajout */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
@@ -281,13 +400,22 @@ export default function Depenses() {
               <h2 className="text-base font-bold text-[#0F172A]">Nouvelle dépense</h2>
               <button onClick={() => { setShowForm(false); setFormErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
+
+            {!online && (
+              <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-3">
+                <p className="text-xs text-[#B45309] font-medium">📶 Mode hors ligne — sera synchronisée au retour du réseau</p>
+              </div>
+            )}
+
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Catégorie</label>
                 <CategoryGrid value={form.category} onChange={(id) => setForm({ ...form, category: id })} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant (FC)</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
+                  Montant ({currency})
+                </label>
                 <input
                   type="number"
                   value={form.amount}
@@ -312,13 +440,17 @@ export default function Depenses() {
                 />
               </div>
             </div>
-            <button onClick={handleAdd} className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4">
-              Enregistrer la dépense
+            <button
+              onClick={handleAdd}
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4"
+            >
+              {online ? 'Enregistrer la dépense' : 'Enregistrer (hors ligne)'}
             </button>
           </div>
         </div>
       )}
 
+      {/* Modal modifier */}
       {editExpense && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[90vh] overflow-y-auto">
@@ -332,7 +464,9 @@ export default function Depenses() {
                 <CategoryGrid value={editForm.category} onChange={(id) => setEditForm({ ...editForm, category: id })} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Montant (FC)</label>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
+                  Montant ({currency})
+                </label>
                 <input
                   type="number"
                   value={editForm.amount}
@@ -364,6 +498,7 @@ export default function Depenses() {
         </div>
       )}
 
+      {/* Modal suppression */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
           <div className="bg-white rounded-2xl w-full max-w-sm p-5">
