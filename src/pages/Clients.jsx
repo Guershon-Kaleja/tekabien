@@ -108,10 +108,24 @@ export default function Clients() {
     }
   }
 
-  const handleDeleteClient = async (client) => {
-    await supabase.from('debts').delete().eq('customer_id', client.id)
-    await supabase.from('debt_payments').delete().eq('customer_id', client.id)
-    await supabase.from('customers').delete().eq('id', client.id)
+ const handleDeleteClient = async (client) => {
+    // Ordre important — respecter les foreign keys
+    await supabase.from('sales')
+      .update({ customer_id: null, customer_name: null })
+      .eq('customer_id', client.id)
+
+    await supabase.from('debt_payments')
+      .delete()
+      .eq('customer_id', client.id)
+
+    await supabase.from('debts')
+      .delete()
+      .eq('customer_id', client.id)
+
+    await supabase.from('customers')
+      .delete()
+      .eq('id', client.id)
+
     setShowDeleteClient(null)
     fetchClients()
   }

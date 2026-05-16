@@ -9,6 +9,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const [loginBlocked, setLoginBlocked] = useState(false)
   const [form, setForm] = useState({
     shop_name: '',
     phone: '',
@@ -131,7 +133,18 @@ export default function Login() {
     })
 
     if (error) {
-      setError('Email/numéro ou mot de passe incorrect')
+      const newAttempts = loginAttempts + 1
+      setLoginAttempts(newAttempts)
+      if (newAttempts >= 5) {
+        setLoginBlocked(true)
+        setError('Trop de tentatives — attends 2 minutes')
+        setTimeout(() => {
+          setLoginBlocked(false)
+          setLoginAttempts(0)
+        }, 120000)
+      } else {
+        setError('Email/numéro ou mot de passe incorrect')
+      }
     }
     setLoading(false)
   }
@@ -368,10 +381,10 @@ export default function Login() {
 
             <button
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || loginBlocked}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
             >
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loginBlocked ? '⛔ Trop de tentatives — attends 2 minutes' : loading ? 'Connexion...' : 'Se connecter'}
             </button>
 
             <p className="text-center text-xs text-[#64748B] mt-4">
