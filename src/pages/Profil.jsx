@@ -85,32 +85,43 @@ export default function Profil() {
     setInviteError('')
     setInviting(true)
 
-    // Chercher l'utilisateur par email
-    const { data: authUsers } = await supabase
-      .from('users')
-      .select('id, shop_name')
-      .eq('email', inviteEmail.trim().toLowerCase())
-      .single()
+    const { data: { session } } = await supabase.auth.getSession()
 
-    if (!authUsers) {
-      setInviteError("Aucun compte trouvé avec cet email — l'utilisateur doit d'abord s'inscrire sur TekaBien")
+    const response = await fetch(
+      'https://qoeextvpjhgqjrnzwkcj.supabase.co/functions/v1/find-user',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ email: inviteEmail.trim().toLowerCase() }),
+      }
+    )
+
+    const data = await response.json()
+
+    if (!data.found) {
+      setInviteError("Aucun compte trouvé — l'utilisateur doit d'abord s'inscrire sur TekaBien")
       setInviting(false)
       return
     }
 
-    if (authUsers.id === user.id) {
+    const targetUser = data.user
+
+    if (targetUser.id === user.id) {
       setInviteError('Tu ne peux pas t\'ajouter toi-même')
       setInviting(false)
       return
     }
 
-    // Vérifier si déjà membre
     const { data: existing } = await supabase
       .from('team_members')
       .select('id')
       .eq('owner_id', user.id)
-      .eq('member_id', authUsers.id)
-      .single()
+      .eq('member_id', targetUser.id)
+      .maybeSingle()
 
     if (existing) {
       setInviteError('Cet utilisateur est déjà dans ton équipe')
@@ -118,31 +129,26 @@ export default function Profil() {
       return
     }
 
-    // Ajouter le membre
     const { error: insertError } = await supabase
       .from('team_members')
       .insert({
         owner_id: user.id,
-        member_id: authUsers.id,
+        member_id: targetUser.id,
         role: 'staff',
       })
 
     if (insertError) {
-      setInviteError('Erreur lors de l\'invitation — réessaie')
+      setInviteError('Erreur — réessaie')
       setInviting(false)
       return
     }
 
-    // Mettre à jour le profil du membre
     await supabase
       .from('users')
-      .update({
-        owner_id: user.id,
-        team_role: 'staff',
-      })
-      .eq('id', authUsers.id)
+      .update({ owner_id: user.id, team_role: 'staff' })
+      .eq('id', targetUser.id)
 
-    setInviteSuccess(`${authUsers.shop_name} a été ajouté à ton équipe ✅`)
+    setInviteSuccess(`${targetUser.shop_name || targetUser.email} ajouté à ton équipe ✅`)
     setInviteEmail('')
     setTimeout(() => setInviteSuccess(''), 4000)
     fetchTeamMembers(user.id)
