@@ -54,7 +54,7 @@ export default function Ventes() {
     orange: '#F97316', mpesa: '#8B5CF6', credit: '#F5A623'
   })[method] || '#64748B'
 
-  const syncPendingSales = async (uid) => {
+ const syncPendingSales = async (uid) => {
     try {
       const id = uid || userId
       if (!id) { setPendingCount(0); return }
@@ -66,6 +66,8 @@ export default function Ventes() {
         const { error: saleError } = await supabase.from('sales').insert(saleData)
         if (!saleError) {
           await markSaleSynced(local_id)
+
+          // Mettre à jour le stock
           if (saleData.product_id) {
             const { data: product } = await supabase
               .from('products').select('quantity')
@@ -74,6 +76,30 @@ export default function Ventes() {
               await supabase.from('products')
                 .update({ quantity: Math.max(0, product.quantity - saleData.quantity) })
                 .eq('id', saleData.product_id).eq('user_id', id)
+            }
+          }
+
+          // Créer la dette si vente à crédit
+          if (saleData.payment_method === 'credit' && saleData.customer_id) {
+            await supabase.from('debts').insert({
+              user_id: id,
+              customer_id: saleData.customer_id,
+              amount: saleData.total,
+              paid: 0,
+              status: 'pending',
+              note: `Vente crédit — ${saleData.product_name}`,
+            })
+
+            const { data: customer } = await supabase
+              .from('customers')
+              .select('total_debt')
+              .eq('id', saleData.customer_id)
+              .single()
+
+            if (customer) {
+              await supabase.from('customers')
+                .update({ total_debt: customer.total_debt + saleData.total })
+                .eq('id', saleData.customer_id)
             }
           }
         }
