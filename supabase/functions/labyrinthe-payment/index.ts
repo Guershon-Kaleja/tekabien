@@ -7,9 +7,16 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')
 const CALLBACK_URL = `${SUPABASE_URL}/functions/v1/payment-callback?secret=${WEBHOOK_SECRET}`
 
+// Prix par plan, devise et durée (en mois)
 const PLAN_PRICES = {
-  pro: { USD: 0.1, CDF: 280 },
-  business: { USD: 0.2, CDF: 560 },
+  pro: {
+    USD: { 1: 0.1, 3: 0.27, 6: 0.51, 12: 0.96 },
+    CDF: { 1: 280, 3: 756, 6: 1428, 12: 2688 },
+  },
+  business: {
+    USD: { 1: 0.2, 3: 0.54, 6: 1.02, 12: 1.92 },
+    CDF: { 1: 560, 3: 1512, 6: 2856, 12: 5376 },
+  },
 }
 
 const corsHeaders = {
@@ -25,16 +32,13 @@ serve(async (req) => {
 
   try {
     const body = await req.json()
-    const { action, phone, plan, currency } = body
+    const { action, phone, plan, currency, duration = 1 } = body
 
     if (action === 'pay') {
 
       const authHeader = req.headers.get('Authorization')
       if (!authHeader) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Non authentifié'
-        }), {
+        return new Response(JSON.stringify({ success: false, message: 'Non authentifié' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         })
@@ -49,10 +53,7 @@ serve(async (req) => {
       const { data: { user }, error: authError } = await supabaseAuth.auth.getUser(token)
 
       if (authError || !user) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Token invalide'
-        }), {
+        return new Response(JSON.stringify({ success: false, message: 'Token invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 401,
         })
@@ -61,26 +62,28 @@ serve(async (req) => {
       const userId = user.id
 
       if (!plan || !PLAN_PRICES[plan]) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Plan invalide'
-        }), {
+        return new Response(JSON.stringify({ success: false, message: 'Plan invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
         })
       }
 
       if (!currency || !['USD', 'CDF'].includes(currency)) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Devise invalide'
-        }), {
+        return new Response(JSON.stringify({ success: false, message: 'Devise invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
         })
       }
 
-      const serverAmount = PLAN_PRICES[plan][currency]
+      const validDurations = [1, 3, 6, 12]
+      if (!validDurations.includes(parseInt(duration))) {
+        return new Response(JSON.stringify({ success: false, message: 'Durée invalide' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
+      const serverAmount = PLAN_PRICES[plan][currency][parseInt(duration)]
 
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -94,10 +97,7 @@ serve(async (req) => {
         .single()
 
       if (!userData) {
-        return new Response(JSON.stringify({
-          success: false,
-          message: 'Utilisateur introuvable'
-        }), {
+        return new Response(JSON.stringify({ success: false, message: 'Utilisateur introuvable' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404,
         })
@@ -111,7 +111,6 @@ serve(async (req) => {
         .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
 
       if (recentPayments && recentPayments.length >= 3) {
-        console.log('Rate limit atteint pour user:', userId)
         return new Response(JSON.stringify({
           success: false,
           message: 'Trop de tentatives — attends 10 minutes avant de réessayer'
@@ -130,7 +129,7 @@ serve(async (req) => {
         callback: CALLBACK_URL,
       }
 
-      console.log('=== Paiement initié — plan:', plan, 'currency:', currency, 'amount:', serverAmount, '===')
+      console.log('=== Paiement initié — plan:', plan, 'duration:', duration, 'currency:', currency, 'amount:', serverAmount, '===')
 
       const response = await fetch(`${LABYRINTHE_BASE_URL}/payment/mobile`, {
         method: 'POST',
@@ -150,6 +149,7 @@ serve(async (req) => {
           plan,
           amount: serverAmount,
           currency,
+          duration: parseInt(duration),
           status: 'pending',
         })
 

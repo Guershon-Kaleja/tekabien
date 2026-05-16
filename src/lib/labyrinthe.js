@@ -11,7 +11,7 @@ const getHeaders = async () => {
   }
 }
 
-export const initiatePayment = async ({ phone, plan, currency = 'USD' }) => {
+export const initiatePayment = async ({ phone, plan, currency = 'USD', duration = 1 }) => {
   try {
     const cleanPhone = phone
       .replace(/\s/g, '')
@@ -24,15 +24,15 @@ export const initiatePayment = async ({ phone, plan, currency = 'USD' }) => {
 
     const headers = await getHeaders()
 
-    // userId et amount ne sont plus envoyés — calculés côté serveur
     const payload = {
       action: 'pay',
       phone: cleanPhone,
       plan,
       currency,
+      duration: parseInt(duration) || 1,
     }
 
-    console.log('Payload envoyé:', payload)
+    console.log('Payload envoyé — plan:', plan, 'duration:', duration, 'currency:', currency)
 
     const response = await fetch(FUNCTION_URL, {
       method: 'POST',
@@ -41,11 +41,8 @@ export const initiatePayment = async ({ phone, plan, currency = 'USD' }) => {
     })
 
     const data = await response.json()
-    console.log('Réponse complète:', data)
 
     if (data?.success) {
-      console.log('Référence Labyrinthe:', data.orderNumber)
-
       return {
         success: true,
         reference: data.orderNumber,

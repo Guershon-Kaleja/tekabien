@@ -8,6 +8,7 @@ export default function Expired() {
   const [step, setStep] = useState('choice')
   const [plan, setPlan] = useState('pro')
   const [currency, setCurrency] = useState('USD')
+  const [duration, setDuration] = useState(1)
   const [phone, setPhone] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -17,9 +18,31 @@ export default function Expired() {
   const [retryDisabled, setRetryDisabled] = useState(false)
   const [currentReference, setCurrentReference] = useState(null)
 
-  const prices = {
+  const basePrices = {
     pro: { USD: 0.1, CDF: 280 },
     business: { USD: 0.2, CDF: 560 },
+  }
+
+  const discounts = { 1: 0, 3: 10, 6: 15, 12: 20 }
+
+  const durations = [
+    { months: 1, label: '1 mois', badge: null },
+    { months: 3, label: '3 mois', badge: '-10%' },
+    { months: 6, label: '6 mois', badge: '-15%' },
+    { months: 12, label: '12 mois', badge: '-20%' },
+  ]
+
+  const getPrice = (p, c, d) => {
+    const base = basePrices[p][c]
+    const discount = discounts[d] || 0
+    const monthly = base * (1 - discount / 100)
+    const total = monthly * d
+    return { monthly, total }
+  }
+
+  const formatPrice = (amount, c) => {
+    if (c === 'USD') return `$${amount.toFixed(2)}`
+    return `${Math.round(amount).toLocaleString('fr-FR')} FC`
   }
 
   useEffect(() => {
@@ -46,12 +69,11 @@ export default function Expired() {
     checkPlan()
   }, [])
 
-  // Polling automatique quand on est à l'étape verify
   useEffect(() => {
     if (step !== 'verify' || !currentReference) return
 
     let attempts = 0
-    const maxAttempts = 20 // 1 minute max
+    const maxAttempts = 20
 
     const interval = setInterval(async () => {
       attempts++
@@ -59,14 +81,11 @@ export default function Expired() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
 
-      // Vérifier le statut du paiement en cours
       const { data: payment } = await supabase
         .from('payments')
         .select('status')
         .eq('reference', currentReference)
         .single()
-
-      console.log('Polling payment status:', payment?.status)
 
       if (payment?.status === 'failed') {
         clearInterval(interval)
@@ -76,7 +95,6 @@ export default function Expired() {
       }
 
       if (payment?.status === 'completed') {
-        // Vérifier que le plan a été mis à jour
         const { data } = await supabase
           .from('users')
           .select('plan, plan_expires')
@@ -96,7 +114,6 @@ export default function Expired() {
         }
       }
 
-      // Timeout après 1 minute
       if (attempts >= maxAttempts) {
         clearInterval(interval)
         setError('Délai dépassé — si tu as payé, contacte le support.')
@@ -109,10 +126,10 @@ export default function Expired() {
 
   const detectOperator = (phone) => {
     const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-    if (/^0(97|98|99)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444', icon: '📱' }
-    if (/^0(80|84|85|89)/.test(clean)) return { name: 'Orange Money', color: '#F97316', icon: '📱' }
-    if (/^0(81|82|83)/.test(clean)) return { name: 'M-Pesa (Vodacom)', color: '#8B5CF6', icon: '📱' }
-    if (/^0(90|91)/.test(clean)) return { name: 'Africell', color: '#16A34A', icon: '📱' }
+    if (/^0(97|98|99)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444' }
+    if (/^0(80|84|85|89)/.test(clean)) return { name: 'Orange Money', color: '#F97316' }
+    if (/^0(81|82|83)/.test(clean)) return { name: 'M-Pesa (Vodacom)', color: '#8B5CF6' }
+    if (/^0(90|91)/.test(clean)) return { name: 'Africell', color: '#16A34A' }
     return null
   }
 
@@ -129,13 +146,13 @@ export default function Expired() {
     setError('')
     setLoading(true)
 
-    const amount = prices[plan][currency]
+    const { monthly, total } = getPrice(plan, currency, duration)
 
     const result = await initiatePayment({
       phone,
-      amount,
-      currency,
       plan,
+      currency,
+      duration,
     })
 
     if (result.success) {
@@ -150,10 +167,7 @@ export default function Expired() {
     setLoading(false)
   }
 
-  const formatPrice = (p, c) => {
-    if (c === 'USD') return `${prices[p].USD}$`
-    return `${prices[p].CDF.toLocaleString('fr-FR')} FC`
-  }
+  const { monthly, total } = getPrice(plan, currency, duration)
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center p-4">
@@ -187,25 +201,21 @@ export default function Expired() {
           )}
         </div>
 
-        <div className="p-6">
+        <div className="p-5">
 
           {step === 'choice' && (
             <>
               {!hasActivePlan && (
-                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-4 mb-5">
+                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
                   <p className="text-[#16A34A] font-bold text-sm mb-1">Continue avec TekaBien Pro</p>
-                  <p className="text-[#16A34A] text-xs leading-relaxed">
-                    Toutes tes données sont sauvegardées. Continue à gérer ta boutique.
-                  </p>
+                  <p className="text-[#16A34A] text-xs">Toutes tes données sont sauvegardées.</p>
                 </div>
               )}
 
               {hasActivePlan && (
-                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-5">
+                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-3 mb-4">
                   <p className="text-[#1A56DB] font-bold text-sm mb-1">Renouvellement anticipé</p>
-                  <p className="text-[#1A56DB] text-xs leading-relaxed">
-                    Le mois supplémentaire sera ajouté à ta date d'expiration actuelle — tu ne perds aucun jour.
-                  </p>
+                  <p className="text-[#1A56DB] text-xs">Les mois seront ajoutés à ta date actuelle.</p>
                 </div>
               )}
 
@@ -215,64 +225,102 @@ export default function Expired() {
                 </div>
               )}
 
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-                Choisis ton plan
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Choix plan */}
+              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Plan</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
                 {[
-                  { id: 'pro', label: 'Pro', desc: 'Pour les boutiques individuelles' },
-                  { id: 'business', label: 'Business', desc: 'Multi-utilisateurs + SMS' },
+                  { id: 'pro', label: 'Pro', desc: 'Boutique individuelle' },
+                  { id: 'business', label: 'Business', desc: 'Multi-users + SMS' },
                 ].map((p) => (
                   <button
                     key={p.id}
                     onClick={() => setPlan(p.id)}
                     className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      plan === p.id
-                        ? 'border-[#1A56DB] bg-[#EBF2FF]'
-                        : 'border-gray-200 bg-white'
+                      plan === p.id ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
                     }`}
                   >
-                    <p className="text-lg font-bold text-[#1A56DB]">{formatPrice(p.id, currency)}</p>
-                    <p className="text-xs font-semibold text-[#0F172A]">{p.label}/mois</p>
-                    <p className="text-xs text-[#64748B] mt-1">{p.desc}</p>
+                    <p className="text-sm font-bold text-[#1A56DB]">
+                      {formatPrice(getPrice(p.id, currency, duration).monthly, currency)}/mois
+                    </p>
+                    <p className="text-xs font-semibold text-[#0F172A]">{p.label}</p>
+                    <p className="text-xs text-[#64748B]">{p.desc}</p>
                   </button>
                 ))}
               </div>
 
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-                Devise de paiement
-              </p>
+              {/* Choix durée */}
+              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Durée</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                {durations.map((d) => {
+                  const { monthly: m, total: t } = getPrice(plan, currency, d.months)
+                  return (
+                    <button
+                      key={d.months}
+                      onClick={() => setDuration(d.months)}
+                      className={`p-3 rounded-xl border-2 text-left transition-all relative ${
+                        duration === d.months ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      {d.badge && (
+                        <span className="absolute top-2 right-2 text-xs font-bold bg-[#16A34A] text-white px-1.5 py-0.5 rounded-full">
+                          {d.badge}
+                        </span>
+                      )}
+                      <p className="text-sm font-bold text-[#1A56DB]">{d.label}</p>
+                      <p className="text-xs text-[#0F172A] font-medium">{formatPrice(t, currency)} total</p>
+                      <p className="text-xs text-[#64748B]">{formatPrice(m, currency)}/mois</p>
+                    </button>
+                  )
+                })}
+              </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              {/* Résumé économie */}
+              {duration > 1 && (
+                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-[#16A34A]">
+                      🎉 Tu économises {discounts[duration]}%
+                    </p>
+                    <p className="text-xs text-[#64748B]">
+                      vs {duration} × {formatPrice(basePrices[plan][currency], currency)} = {formatPrice(basePrices[plan][currency] * duration, currency)}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-[#16A34A]">
+                    -{formatPrice((basePrices[plan][currency] * duration) - total, currency)}
+                  </p>
+                </div>
+              )}
+
+              {/* Choix devise */}
+              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Devise</p>
+              <div className="grid grid-cols-2 gap-2 mb-4">
                 {[
-                  { id: 'USD', label: 'Dollar américain', symbol: '$' },
+                  { id: 'USD', label: 'Dollar', symbol: '$' },
                   { id: 'CDF', label: 'Franc congolais', symbol: 'FC' },
                 ].map((c) => (
                   <button
                     key={c.id}
                     onClick={() => setCurrency(c.id)}
                     className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      currency === c.id
-                        ? 'border-[#1A56DB] bg-[#EBF2FF]'
-                        : 'border-gray-200 bg-white'
+                      currency === c.id ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
                     }`}
                   >
                     <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
                     <p className="text-xs font-semibold text-[#0F172A]">{c.id}</p>
-                    <p className="text-xs text-[#64748B] mt-1">{c.label}</p>
+                    <p className="text-xs text-[#64748B]">{c.label}</p>
                   </button>
                 ))}
               </div>
 
+              {/* Numéro téléphone */}
               <div className="mb-4">
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Ton numéro Mobile Money
+                  Numéro Mobile Money
                 </label>
                 <input
                   value={phone}
                   onChange={(e) => { setPhone(e.target.value); setError('') }}
-                  placeholder="Ex: 0891000200"
+                  placeholder="Ex: 0891234567"
                   className={`w-full border rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB] ${
                     error ? 'border-[#DC2626]' : 'border-gray-200'
                   }`}
@@ -282,36 +330,31 @@ export default function Expired() {
                   if (phone.length >= 4 && operator) {
                     return (
                       <div className="flex items-center gap-2 mt-2 bg-[#F0FDF4] border border-green-200 rounded-lg px-3 py-2">
-                        <span>{operator.icon}</span>
                         <span className="text-xs font-semibold" style={{ color: operator.color }}>
-                          {operator.name} détecté ✅
+                          📱 {operator.name} détecté ✅
                         </span>
                       </div>
                     )
                   }
                   if (phone.length >= 4 && !operator) {
                     return (
-                      <div className="flex items-center gap-2 mt-2 bg-[#FEF2F2] border border-red-200 rounded-lg px-3 py-2">
-                        <span className="text-xs text-[#DC2626] font-medium">
-                          ❌ Opérateur non reconnu — vérifie ton numéro
-                        </span>
-                      </div>
+                      <p className="text-xs text-[#DC2626] mt-1">❌ Opérateur non reconnu</p>
                     )
                   }
-                  return (
-                    <p className="text-xs text-[#64748B] mt-1">
-                      Airtel, Orange, M-Pesa ou Africell
-                    </p>
-                  )
+                  return <p className="text-xs text-[#64748B] mt-1">Airtel, Orange, M-Pesa ou Africell</p>
                 })()}
               </div>
 
+              {/* Bouton payer */}
               <button
                 onClick={handleInitiatePayment}
                 disabled={loading}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3 disabled:opacity-50"
               >
-                {loading ? 'Envoi de la demande...' : `Payer ${formatPrice(plan, currency)}/mois`}
+                {loading
+                  ? 'Envoi de la demande...'
+                  : `Payer ${formatPrice(total, currency)} pour ${duration} mois`
+                }
               </button>
 
               <button
@@ -327,19 +370,18 @@ export default function Expired() {
             <>
               <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-4 mb-4">
                 <p className="text-[#B45309] font-bold text-sm mb-1">⏳ Demande envoyée</p>
-                <p className="text-[#B45309] text-xs leading-relaxed">
-                  Une demande de paiement a été envoyée sur ton téléphone. Entre ton code PIN pour confirmer.
-                </p>
+                <p className="text-[#B45309] text-xs">Entre ton code PIN sur ton téléphone pour confirmer.</p>
               </div>
 
               <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
-                <p className="text-xs text-[#64748B] mb-1">Plan sélectionné</p>
+                <p className="text-xs text-[#64748B] mb-1">Récapitulatif</p>
                 <p className="text-sm font-bold text-[#0F172A]">
-                  {plan === 'pro' ? 'Pro' : 'Business'} — {formatPrice(plan, currency)}/mois
+                  {plan === 'pro' ? 'Pro' : 'Business'} — {duration} mois
                 </p>
-                <p className="text-xs text-[#64748B] mt-1">
-                  Devise : {currency === 'USD' ? 'Dollar américain ($)' : 'Franc congolais (FC)'}
-                </p>
+                <p className="text-sm font-bold text-[#1A56DB]">{formatPrice(total, currency)} total</p>
+                {duration > 1 && (
+                  <p className="text-xs text-[#16A34A]">🎉 {discounts[duration]}% de réduction appliquée</p>
+                )}
               </div>
 
               <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-4">
@@ -347,7 +389,7 @@ export default function Expired() {
                   <div className="w-6 h-6 border-2 border-[#1A56DB] border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
                   <div>
                     <p className="text-xs text-[#1A56DB] font-semibold">Activation automatique en cours</p>
-                    <p className="text-xs text-[#64748B] mt-0.5">Dès que tu confirmes le PIN, ton plan sera activé automatiquement</p>
+                    <p className="text-xs text-[#64748B] mt-0.5">Dès que tu confirmes le PIN, ton plan sera activé</p>
                   </div>
                 </div>
               </div>
@@ -380,6 +422,10 @@ export default function Expired() {
               <p className="text-4xl mb-4">🎉</p>
               <p className="text-lg font-bold text-[#0F172A] mb-2">
                 {hasActivePlan ? 'Abonnement renouvelé !' : 'Bienvenue dans TekaBien Pro !'}
+              </p>
+              <p className="text-sm text-[#16A34A] font-medium mb-1">
+                {duration} mois activés
+                {duration > 1 && ` — ${discounts[duration]}% de réduction appliquée`}
               </p>
               <p className="text-sm text-[#64748B]">Redirection vers ton dashboard...</p>
             </div>
