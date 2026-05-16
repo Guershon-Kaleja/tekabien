@@ -89,7 +89,19 @@ export default function Ventes() {
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    setUserId(user.id)
+
+    // Si employé, utiliser l'ID du patron
+    const { data: teamData } = await supabase
+      .from('users')
+      .select('plan, team_role, owner_id')
+      .eq('id', user.id)
+      .single()
+
+    const effectiveId = teamData?.team_role === 'staff' && teamData?.owner_id
+      ? teamData.owner_id
+      : user.id
+
+    setUserId(effectiveId)
 
     const { data: userData } = await supabase
       .from('users').select('plan').eq('id', user.id).single()
