@@ -186,17 +186,17 @@ export default function Profil() {
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
               <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
-                Informations de la boutique
+                Informations de ton activité
               </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                    Nom de la boutique
+                    Nom de ton activité
                   </label>
                   <input
                     value={form.shop_name}
                     onChange={(e) => { setForm({ ...form, shop_name: e.target.value }); setError('') }}
-                    placeholder="Ex: Boutique Mama Jeanne"
+                    placeholder="Ex: Ventes en ligne, Salon Merveille..."
                     className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
                   />
                 </div>

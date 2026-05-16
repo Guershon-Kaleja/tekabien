@@ -29,6 +29,10 @@ export default function Depenses() {
     { id: 'loyer', label: 'Loyer', icon: '🏠' },
     { id: 'salaire', label: 'Salaire', icon: '👤' },
     { id: 'electricite', label: 'Électricité', icon: '💡' },
+    { id: 'livraison', label: 'Livraison', icon: '🚚' },
+    { id: 'publicite', label: 'Publicité', icon: '📣' },
+    { id: 'internet', label: 'Internet/Téléphone', icon: '📱' },
+    { id: 'emballage', label: 'Emballage', icon: '📦' },
     { id: 'autre', label: 'Autre', icon: '📌' },
   ]
 
