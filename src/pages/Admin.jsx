@@ -113,7 +113,6 @@ export default function Admin() {
     const styles = {
       trial: { bg: '#FFFBEB', color: '#B45309', label: 'Essai' },
       pro: { bg: '#F0FDF4', color: '#16A34A', label: 'Pro' },
-      business: { bg: '#EBF2FF', color: '#1A56DB', label: 'Business' },
       free: { bg: '#F8FAFF', color: '#64748B', label: 'Gratuit' },
       disabled: { bg: '#FEF2F2', color: '#DC2626', label: 'Désactivé' },
     }
@@ -266,13 +265,6 @@ export default function Admin() {
                   style={{ background: 'rgba(22,163,74,0.2)', color: '#16A34A' }}
                 >
                   ✓ Activer Pro
-                </button>
-                <button
-                  onClick={() => handleActivatePlan(u.id, 'business')}
-                  className="flex-1 py-2 rounded-lg text-xs font-semibold"
-                  style={{ background: 'rgba(26,86,219,0.2)', color: '#1A56DB' }}
-                >
-                  ✓ Business
                 </button>
                 <button
                   onClick={() => handleDisableUser(u.id)}

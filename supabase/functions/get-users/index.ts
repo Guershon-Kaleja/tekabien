@@ -12,7 +12,6 @@ serve(async (req) => {
   }
 
   try {
-    // Vérifier que l'utilisateur est admin
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
@@ -21,12 +20,12 @@ serve(async (req) => {
       })
     }
 
+    // Vérifier le token avec anon
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    // Vérifier le token de l'utilisateur
     const token = authHeader.replace('Bearer ', '')
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
@@ -37,8 +36,13 @@ serve(async (req) => {
       })
     }
 
-    // Vérifier que l'utilisateur est admin
-    const { data: userData } = await supabase
+    // Tout le reste avec service role
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    )
+
+    const { data: userData } = await supabaseAdmin
       .from('users')
       .select('role')
       .eq('id', user.id)
@@ -50,12 +54,6 @@ serve(async (req) => {
         status: 403,
       })
     }
-
-    // Récupérer tous les utilisateurs avec service role
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
 
     const { data: users, error } = await supabaseAdmin
       .from('users')
