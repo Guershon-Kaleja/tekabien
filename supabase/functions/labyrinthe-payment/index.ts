@@ -7,15 +7,11 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')
 const CALLBACK_URL = `${SUPABASE_URL}/functions/v1/payment-callback?secret=${WEBHOOK_SECRET}`
 
-// Prix par plan, devise et durée (en mois)
+// Plan Pro uniquement
 const PLAN_PRICES = {
   pro: {
     USD: { 1: 0.1, 3: 0.27, 6: 0.51, 12: 0.96 },
     CDF: { 1: 280, 3: 756, 6: 1428, 12: 2688 },
-  },
-  business: {
-    USD: { 1: 0.2, 3: 0.54, 6: 1.02, 12: 1.92 },
-    CDF: { 1: 560, 3: 1512, 6: 2856, 12: 5376 },
   },
 }
 
@@ -61,7 +57,8 @@ serve(async (req) => {
 
       const userId = user.id
 
-      if (!plan || !PLAN_PRICES[plan]) {
+      // Seul le plan Pro est accepté
+      if (plan !== 'pro') {
         return new Response(JSON.stringify({ success: false, message: 'Plan invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -83,7 +80,7 @@ serve(async (req) => {
         })
       }
 
-      const serverAmount = PLAN_PRICES[plan][currency][parseInt(duration)]
+      const serverAmount = PLAN_PRICES.pro[currency][parseInt(duration)]
 
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -129,7 +126,7 @@ serve(async (req) => {
         callback: CALLBACK_URL,
       }
 
-      console.log('=== Paiement initié — plan:', plan, 'duration:', duration, 'currency:', currency, 'amount:', serverAmount, '===')
+      console.log('=== Paiement initié — plan: pro, duration:', duration, 'currency:', currency, 'amount:', serverAmount, '===')
 
       const response = await fetch(`${LABYRINTHE_BASE_URL}/payment/mobile`, {
         method: 'POST',
@@ -146,7 +143,7 @@ serve(async (req) => {
           user_id: userId,
           reference: data.orderNumber,
           order_number: data.orderNumber,
-          plan,
+          plan: 'pro',
           amount: serverAmount,
           currency,
           duration: parseInt(duration),

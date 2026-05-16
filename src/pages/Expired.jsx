@@ -6,7 +6,6 @@ import { initiatePayment } from '../lib/labyrinthe'
 export default function Expired() {
   const navigate = useNavigate()
   const [step, setStep] = useState('choice')
-  const [plan, setPlan] = useState('pro')
   const [currency, setCurrency] = useState('USD')
   const [duration, setDuration] = useState(1)
   const [phone, setPhone] = useState('')
@@ -20,7 +19,6 @@ export default function Expired() {
 
   const basePrices = {
     pro: { USD: 0.1, CDF: 280 },
-    business: { USD: 0.2, CDF: 560 },
   }
 
   const discounts = { 1: 0, 3: 10, 6: 15, 12: 20 }
@@ -32,8 +30,8 @@ export default function Expired() {
     { months: 12, label: '12 mois', badge: '-20%' },
   ]
 
-  const getPrice = (p, c, d) => {
-    const base = basePrices[p][c]
+  const getPrice = (c, d) => {
+    const base = basePrices.pro[c]
     const discount = discounts[d] || 0
     const monthly = base * (1 - discount / 100)
     const total = monthly * d
@@ -59,7 +57,7 @@ export default function Expired() {
       if (data) {
         setCurrentPlan(data.plan)
         setPreviousExpiry(data.plan_expires)
-        if (data.plan === 'pro' || data.plan === 'business') {
+        if (data.plan === 'pro') {
           const expires = new Date(data.plan_expires)
           const grace = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
           if (new Date() < grace) setHasActivePlan(true)
@@ -101,7 +99,7 @@ export default function Expired() {
           .eq('id', session.user.id)
           .single()
 
-        if (data?.plan === 'pro' || data?.plan === 'business') {
+        if (data?.plan === 'pro') {
           const expires = new Date(data.plan_expires)
           const previous = previousExpiry ? new Date(previousExpiry) : new Date()
 
@@ -148,7 +146,7 @@ export default function Expired() {
 
     const result = await initiatePayment({
       phone,
-      plan,
+      plan: 'pro',
       currency,
       duration,
     })
@@ -165,7 +163,7 @@ export default function Expired() {
     setLoading(false)
   }
 
-  const { monthly, total } = getPrice(plan, currency, duration)
+  const { monthly, total } = getPrice(currency, duration)
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center p-4">
@@ -195,9 +193,9 @@ export default function Expired() {
               ? 'Débloque toutes les fonctionnalités'
               : 'Ton essai gratuit de 30 jours est expiré'}
           </p>
-          {hasActivePlan && currentPlan && (
+          {hasActivePlan && (
             <span className="inline-block mt-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">
-              Plan {currentPlan === 'pro' ? 'Pro' : 'Business'} actif
+              Plan Pro actif
             </span>
           )}
         </div>
@@ -233,34 +231,30 @@ export default function Expired() {
                 </div>
               )}
 
-              {/* Choix plan */}
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Plan</p>
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                {[
-                  { id: 'pro', label: 'Pro', desc: 'Boutique individuelle' },
-                  { id: 'business', label: 'Business', desc: 'Multi-users + SMS' },
-                ].map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPlan(p.id)}
-                    className={`p-3 rounded-xl border-2 text-left transition-all ${
-                      plan === p.id ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
-                    }`}
-                  >
-                    <p className="text-sm font-bold text-[#1A56DB]">
-                      {formatPrice(getPrice(p.id, currency, duration).monthly, currency)}/mois
-                    </p>
-                    <p className="text-xs font-semibold text-[#0F172A]">{p.label}</p>
-                    <p className="text-xs text-[#64748B]">{p.desc}</p>
-                  </button>
-                ))}
+              {/* Plan Pro uniquement */}
+              <div className="bg-[#EBF2FF] border-2 border-[#1A56DB] rounded-xl p-4 mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold text-[#0F172A]">Plan Pro</p>
+                    <p className="text-xs text-[#64748B]">Toutes les fonctionnalités débloquées</p>
+                  </div>
+                  <span className="text-xs font-bold bg-[#1A56DB] text-white px-2 py-1 rounded-lg">PRO</span>
+                </div>
+                <p className="text-xl font-bold text-[#1A56DB]">
+                  {formatPrice(monthly, currency)}<span className="text-sm font-normal text-[#64748B]">/mois</span>
+                </p>
+                {duration > 1 && (
+                  <p className="text-xs text-[#16A34A] mt-1">
+                    🎉 {discounts[duration]}% de réduction — {formatPrice(total, currency)} total
+                  </p>
+                )}
               </div>
 
               {/* Choix durée */}
               <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Durée</p>
               <div className="grid grid-cols-2 gap-2 mb-4">
                 {durations.map((d) => {
-                  const { monthly: m, total: t } = getPrice(plan, currency, d.months)
+                  const { monthly: m, total: t } = getPrice(currency, d.months)
                   return (
                     <button
                       key={d.months}
@@ -290,11 +284,11 @@ export default function Expired() {
                       🎉 Tu économises {discounts[duration]}%
                     </p>
                     <p className="text-xs text-[#64748B]">
-                      vs {duration} × {formatPrice(basePrices[plan][currency], currency)} = {formatPrice(basePrices[plan][currency] * duration, currency)}
+                      vs {duration} × {formatPrice(basePrices.pro[currency], currency)} = {formatPrice(basePrices.pro[currency] * duration, currency)}
                     </p>
                   </div>
                   <p className="text-sm font-bold text-[#16A34A]">
-                    -{formatPrice((basePrices[plan][currency] * duration) - total, currency)}
+                    -{formatPrice((basePrices.pro[currency] * duration) - total, currency)}
                   </p>
                 </div>
               )}
@@ -382,9 +376,7 @@ export default function Expired() {
 
               <div className="bg-white border border-gray-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-[#64748B] mb-1">Récapitulatif</p>
-                <p className="text-sm font-bold text-[#0F172A]">
-                  {plan === 'pro' ? 'Pro' : 'Business'} — {duration} mois
-                </p>
+                <p className="text-sm font-bold text-[#0F172A]">Pro — {duration} mois</p>
                 <p className="text-sm font-bold text-[#1A56DB]">{formatPrice(total, currency)} total</p>
                 {duration > 1 && (
                   <p className="text-xs text-[#16A34A]">🎉 {discounts[duration]}% de réduction appliquée</p>
