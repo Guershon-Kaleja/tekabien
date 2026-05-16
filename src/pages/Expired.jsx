@@ -146,8 +146,6 @@ export default function Expired() {
     setError('')
     setLoading(true)
 
-    const { monthly, total } = getPrice(plan, currency, duration)
-
     const result = await initiatePayment({
       phone,
       plan,
@@ -176,7 +174,7 @@ export default function Expired() {
         <div className="bg-[#1A56DB] p-6 text-center">
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-3">
             <span className="text-4xl">
-              {step === 'success' ? '🎉' : hasActivePlan ? '💳' : '⏰'}
+              {step === 'success' ? '🎉' : hasActivePlan ? '💳' : currentPlan === 'free' ? '🚀' : '⏰'}
             </span>
           </div>
           <h1 className="text-white font-bold text-xl">
@@ -184,6 +182,8 @@ export default function Expired() {
               ? 'Paiement confirmé !'
               : hasActivePlan
               ? 'Renouveler mon abonnement'
+              : currentPlan === 'free'
+              ? 'Passe au Pro'
               : 'Essai terminé'}
           </h1>
           <p className="text-blue-200 text-sm mt-1">
@@ -191,8 +191,9 @@ export default function Expired() {
               ? 'Ton plan est actif. Redirection...'
               : hasActivePlan
               ? 'Continue à utiliser TekaBien sans interruption'
-              : 'Ton essai gratuit de 30 jours est expiré'
-            }
+              : currentPlan === 'free'
+              ? 'Débloque toutes les fonctionnalités'
+              : 'Ton essai gratuit de 30 jours est expiré'}
           </p>
           {hasActivePlan && currentPlan && (
             <span className="inline-block mt-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">
@@ -205,17 +206,24 @@ export default function Expired() {
 
           {step === 'choice' && (
             <>
-              {!hasActivePlan && (
-                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
-                  <p className="text-[#16A34A] font-bold text-sm mb-1">Continue avec TekaBien Pro</p>
-                  <p className="text-[#16A34A] text-xs">Toutes tes données sont sauvegardées.</p>
-                </div>
-              )}
-
               {hasActivePlan && (
                 <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-3 mb-4">
                   <p className="text-[#1A56DB] font-bold text-sm mb-1">Renouvellement anticipé</p>
                   <p className="text-[#1A56DB] text-xs">Les mois seront ajoutés à ta date actuelle.</p>
+                </div>
+              )}
+
+              {!hasActivePlan && currentPlan === 'free' && (
+                <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-3 mb-4">
+                  <p className="text-[#1A56DB] font-bold text-sm mb-1">🚀 Passe au Pro</p>
+                  <p className="text-[#1A56DB] text-xs">Ventes illimitées, produits illimités, rapports complets.</p>
+                </div>
+              )}
+
+              {!hasActivePlan && currentPlan !== 'free' && (
+                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
+                  <p className="text-[#16A34A] font-bold text-sm mb-1">Continue avec TekaBien Pro</p>
+                  <p className="text-[#16A34A] text-xs">Toutes tes données sont sauvegardées.</p>
                 </div>
               )}
 
@@ -345,7 +353,6 @@ export default function Expired() {
                 })()}
               </div>
 
-              {/* Bouton payer */}
               <button
                 onClick={handleInitiatePayment}
                 disabled={loading}
