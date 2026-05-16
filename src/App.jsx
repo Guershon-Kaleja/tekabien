@@ -1,19 +1,21 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import useAutoLogout from './hooks/useAutoLogout'
-import Login from './pages/Login'
-import Onboarding from './pages/Onboarding'
-import Dashboard from './pages/Dashboard'
-import Ventes from './pages/Ventes'
-import Stocks from './pages/Stocks'
-import Clients from './pages/Clients'
-import Depenses from './pages/Depenses'
-import Admin from './pages/Admin'
-import Rapports from './pages/Rapports'
-import Expired from './pages/Expired'
-import ResetPassword from './pages/ResetPassword'
-import Profil from './pages/Profil'
+
+// Lazy loading — chaque page chargée seulement quand nécessaire
+const Login = lazy(() => import('./pages/Login'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Ventes = lazy(() => import('./pages/Ventes'))
+const Stocks = lazy(() => import('./pages/Stocks'))
+const Clients = lazy(() => import('./pages/Clients'))
+const Depenses = lazy(() => import('./pages/Depenses'))
+const Admin = lazy(() => import('./pages/Admin'))
+const Rapports = lazy(() => import('./pages/Rapports'))
+const Expired = lazy(() => import('./pages/Expired'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Profil = lazy(() => import('./pages/Profil'))
 
 function App() {
   const [session, setSession] = useState(null)
@@ -118,20 +120,31 @@ function App() {
   return (
     <BrowserRouter>
       <div className="max-w-md mx-auto relative min-h-screen bg-[#EEF2F7] overflow-x-hidden">
-        <Routes>
-          <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
-          <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
-          <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
-          <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
-          <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
-          <Route path="/tb-admin-2025" element={<Admin />} />
-          <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
-          <Route path="/expired" element={<Expired />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
-        </Routes>
+        <Suspense fallback={
+          <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-[#0F172A] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-2xl">🏪</span>
+              </div>
+              <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
+            </div>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
+            <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
+            <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
+            <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
+            <Route path="/tb-admin-2025" element={<Admin />} />
+            <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
+            <Route path="/expired" element={<Expired />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
+          </Routes>
+        </Suspense>  
       </div>
     </BrowserRouter>
   )
