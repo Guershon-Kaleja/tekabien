@@ -64,9 +64,8 @@ export default function Admin() {
         setStats({
           totalUsers: data.users.length,
           activeTrials: data.users.filter(u => u.plan === 'trial').length,
-          paidUsers: data.users.filter(u => u.plan === 'pro' || u.plan === 'business').length,
-          revenue: data.users.filter(u => u.plan === 'pro').length * 3 +
-                   data.users.filter(u => u.plan === 'business').length * 6,
+          paidUsers: data.users.filter(u => u.plan === 'pro').length,
+          revenue: data.users.filter(u => u.plan === 'pro').length * 3,
         })
       }
     } catch (err) {
