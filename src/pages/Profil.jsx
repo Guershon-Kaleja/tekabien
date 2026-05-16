@@ -20,14 +20,6 @@ export default function Profil() {
   const [userPlan, setUserPlan] = useState(null)
   const [planExpires, setPlanExpires] = useState(null)
 
-  // Équipe
-  const [teamMembers, setTeamMembers] = useState([])
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteError, setInviteError] = useState('')
-  const [inviteSuccess, setInviteSuccess] = useState('')
-  const [inviting, setInviting] = useState(false)
-  const [teamRole, setTeamRole] = useState('owner')
-
   useEffect(() => { fetchProfile() }, [])
 
   const fetchProfile = async () => {
@@ -37,7 +29,7 @@ export default function Profil() {
 
     const { data } = await supabase
       .from('users')
-      .select('shop_name, phone, plan, plan_expires, currency, team_role')
+      .select('shop_name, phone, plan, plan_expires, currency')
       .eq('id', authUser.id)
       .single()
 
@@ -49,122 +41,9 @@ export default function Profil() {
       })
       setUserPlan(data.plan)
       setPlanExpires(data.plan_expires)
-      setTeamRole(data.team_role || 'owner')
     }
 
-    await fetchTeamMembers(authUser.id)
     setLoading(false)
-  }
-
-  const fetchTeamMembers = async (ownerId) => {
-    const { data } = await supabase
-      .from('team_members')
-      .select(`
-        id,
-        role,
-        status,
-        created_at,
-        member:member_id (
-          id,
-          shop_name,
-          phone
-        )
-      `)
-      .eq('owner_id', ownerId)
-      .order('created_at', { ascending: false })
-
-    if (data) setTeamMembers(data)
-  }
-
-  const handleInviteMember = async () => {
-    if (!inviteEmail || !inviteEmail.includes('@')) {
-      setInviteError('Entre un email valide')
-      return
-    }
-    setInviteError('')
-    setInviting(true)
-
-    const { data: { session } } = await supabase.auth.getSession()
-
-    const response = await fetch(
-      'https://qoeextvpjhgqjrnzwkcj.supabase.co/functions/v1/find-user',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ email: inviteEmail.trim().toLowerCase() }),
-      }
-    )
-
-    const data = await response.json()
-
-    if (!data.found) {
-      setInviteError("Aucun compte trouvé — l'utilisateur doit d'abord s'inscrire sur TekaBien")
-      setInviting(false)
-      return
-    }
-
-    const targetUser = data.user
-
-    if (targetUser.id === user.id) {
-      setInviteError('Tu ne peux pas t\'ajouter toi-même')
-      setInviting(false)
-      return
-    }
-
-    const { data: existing } = await supabase
-      .from('team_members')
-      .select('id')
-      .eq('owner_id', user.id)
-      .eq('member_id', targetUser.id)
-      .maybeSingle()
-
-    if (existing) {
-      setInviteError('Cet utilisateur est déjà dans ton équipe')
-      setInviting(false)
-      return
-    }
-
-    const { error: insertError } = await supabase
-      .from('team_members')
-      .insert({
-        owner_id: user.id,
-        member_id: targetUser.id,
-        role: 'staff',
-        status: 'pending',
-      })
-
-    if (insertError) {
-      setInviteError('Erreur — réessaie')
-      setInviting(false)
-      return
-    }
-
-    setInviteSuccess(`Invitation envoyée à ${targetUser.shop_name || targetUser.email} ✅`)
-    setInviteEmail('')
-    setTimeout(() => setInviteSuccess(''), 4000)
-    fetchTeamMembers(user.id)
-    setInviting(false)
-  }
-
-  const handleRemoveMember = async (member) => {
-    await supabase
-      .from('team_members')
-      .delete()
-      .eq('id', member.id)
-
-    await supabase
-      .from('users')
-      .update({
-        owner_id: null,
-        team_role: 'owner',
-      })
-      .eq('id', member.member.id)
-
-    fetchTeamMembers(user.id)
   }
 
   const handleSaveProfile = async () => {
@@ -239,16 +118,6 @@ export default function Profil() {
     business: '#EBF2FF', free: '#F8FAFF',
   })[plan] || '#F8FAFF'
 
-  const tabs = [
-    { id: 'profil', label: '👤 Profil' },
-    { id: 'securite', label: '🔒 Sécurité' },
-    { id: 'abonnement', label: '💳 Abonnement' },
-    ...(userPlan === 'business' && teamRole === 'owner'
-      ? [{ id: 'equipe', label: '👥 Équipe' }]
-      : []
-    ),
-  ]
-
   if (loading) {
     return (
       <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
@@ -262,18 +131,16 @@ export default function Profil() {
 
       <Header title="Mon profil" />
 
-      {teamRole === 'staff' && (
-        <div className="bg-[#EBF2FF] border-b border-blue-200 px-4 py-2">
-          <p className="text-xs text-[#1A56DB] font-medium">👤 Tu es employé — accès limité aux ventes</p>
-        </div>
-      )}
-
-      <div className="flex bg-white border-b border-gray-200 overflow-x-auto">
-        {tabs.map((t) => (
+      <div className="flex bg-white border-b border-gray-200">
+        {[
+          { id: 'profil', label: '👤 Profil' },
+          { id: 'securite', label: '🔒 Sécurité' },
+          { id: 'abonnement', label: '💳 Abonnement' },
+        ].map((t) => (
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`flex-shrink-0 flex-1 py-3 text-xs font-semibold transition-colors ${
+            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
               activeTab === t.id
                 ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
                 : 'text-[#64748B]'
@@ -290,7 +157,7 @@ export default function Profil() {
           <>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4 text-center">
               <div className="w-16 h-16 bg-[#1A56DB] rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <span className="text-3xl">{teamRole === 'staff' ? '👤' : '🏪'}</span>
+                <span className="text-3xl">🏪</span>
               </div>
               <p className="text-base font-bold text-[#0F172A]">{form.shop_name}</p>
               <p className="text-xs text-[#64748B] mt-1">{user?.email}</p>
@@ -298,7 +165,7 @@ export default function Profil() {
                 className="inline-block text-xs font-semibold px-3 py-1 rounded-full mt-2"
                 style={{ background: getPlanBg(userPlan), color: getPlanColor(userPlan) }}
               >
-                {teamRole === 'staff' ? '👤 Employé' : `Plan ${getPlanLabel(userPlan)}`}
+                Plan {getPlanLabel(userPlan)}
               </span>
             </div>
 
@@ -316,12 +183,12 @@ export default function Profil() {
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
               <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
-                Informations
+                Informations de la boutique
               </p>
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                    {teamRole === 'staff' ? 'Ton nom' : 'Nom de la boutique'}
+                    Nom de la boutique
                   </label>
                   <input
                     value={form.shop_name}
@@ -350,38 +217,38 @@ export default function Profil() {
                     disabled
                     className="w-full border border-gray-100 bg-gray-50 rounded-xl px-3 py-3 text-sm text-[#64748B] outline-none cursor-not-allowed"
                   />
+                  <p className="text-xs text-[#64748B] mt-1">L'email ne peut pas être modifié</p>
                 </div>
 
-                {teamRole === 'owner' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                      Devise de la boutique
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { id: 'FC', label: 'Franc Congolais', symbol: 'FC', desc: 'Ex: 5 000 FC' },
-                        { id: 'USD', label: 'Dollar américain', symbol: '$', desc: 'Ex: $2.50' },
-                      ].map((c) => (
-                        <button
-                          key={c.id}
-                          onClick={() => setForm({ ...form, currency: c.id })}
-                          className={`p-3 rounded-xl border-2 text-left transition-all ${
-                            form.currency === c.id
-                              ? 'border-[#1A56DB] bg-[#EBF2FF]'
-                              : 'border-gray-200 bg-white'
-                          }`}
-                        >
-                          <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
-                          <p className="text-xs font-semibold text-[#0F172A]">{c.id}</p>
-                          <p className="text-xs text-[#64748B] mt-1">{c.desc}</p>
-                        </button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-[#64748B] mt-2">
-                      ⚠️ Changer la devise n'affecte pas les montants existants.
-                    </p>
+                {/* Choix de devise */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                    Devise de la boutique
+                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'FC', label: 'Franc Congolais', symbol: 'FC', desc: 'Ex: 5 000 FC' },
+                      { id: 'USD', label: 'Dollar américain', symbol: '$', desc: 'Ex: $2.50' },
+                    ].map((c) => (
+                      <button
+                        key={c.id}
+                        onClick={() => setForm({ ...form, currency: c.id })}
+                        className={`p-3 rounded-xl border-2 text-left transition-all ${
+                          form.currency === c.id
+                            ? 'border-[#1A56DB] bg-[#EBF2FF]'
+                            : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
+                        <p className="text-xs font-semibold text-[#0F172A]">{c.id}</p>
+                        <p className="text-xs text-[#64748B] mt-1">{c.desc}</p>
+                      </button>
+                    ))}
                   </div>
-                )}
+                  <p className="text-xs text-[#64748B] mt-2">
+                    ⚠️ Changer la devise n'affecte pas les montants existants — uniquement l'affichage.
+                  </p>
+                </div>
               </div>
 
               <button
@@ -488,8 +355,8 @@ export default function Profil() {
                 { feature: 'Produits illimités', free: false, pro: true, business: true },
                 { feature: 'Clients illimités', free: false, pro: true, business: true },
                 { feature: 'Rapports complets', free: false, pro: true, business: true },
-                { feature: 'Export PDF', free: false, pro: true, business: true },
                 { feature: 'Mode offline', free: true, pro: true, business: true },
+                { feature: 'SMS rappels clients', free: false, pro: false, business: true },
                 { feature: 'Multi-utilisateurs', free: false, pro: false, business: true },
               ].map((f, i) => (
                 <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
@@ -527,95 +394,6 @@ export default function Profil() {
               >
                 Renouveler mon abonnement
               </button>
-            )}
-          </>
-        )}
-
-        {activeTab === 'equipe' && userPlan === 'business' && (
-          <>
-            <div className="bg-[#EBF2FF] border border-blue-200 rounded-xl p-4 mb-4">
-              <p className="text-xs font-semibold text-[#1A56DB] mb-1">👥 Gestion d'équipe Business</p>
-              <p className="text-xs text-[#64748B]">
-                Invite des employés — ils pourront enregistrer des ventes depuis leur propre compte.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-                Inviter un employé
-              </p>
-
-              {inviteSuccess && (
-                <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-3">
-                  <p className="text-xs text-[#16A34A] font-medium">{inviteSuccess}</p>
-                </div>
-              )}
-
-              {inviteError && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
-                  <p className="text-xs text-[#DC2626]">{inviteError}</p>
-                </div>
-              )}
-
-              <div className="mb-3">
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Email de l'employé
-                </label>
-                <input
-                  value={inviteEmail}
-                  onChange={(e) => { setInviteEmail(e.target.value); setInviteError('') }}
-                  placeholder="employe@email.com"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
-                />
-                <p className="text-xs text-[#64748B] mt-1">
-                  L'employé doit d'abord créer un compte TekaBien
-                </p>
-              </div>
-
-              <button
-                onClick={handleInviteMember}
-                disabled={inviting}
-                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
-              >
-                {inviting ? 'Invitation...' : '+ Inviter un employé'}
-              </button>
-            </div>
-
-            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
-              Membres de l'équipe ({teamMembers.length})
-            </p>
-
-            {teamMembers.length === 0 ? (
-              <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-                <p className="text-3xl mb-2">👥</p>
-                <p className="text-sm font-semibold text-[#0F172A]">Aucun employé</p>
-                <p className="text-xs text-[#64748B] mt-1">Invite ton premier employé ci-dessus</p>
-              </div>
-            ) : (
-              teamMembers.map((m) => (
-                <div key={m.id} className="bg-white rounded-xl border border-gray-200 p-3 mb-2 flex items-center gap-3">
-                  <div className="w-9 h-9 bg-[#EBF2FF] rounded-full flex items-center justify-center text-sm font-bold text-[#1A56DB] flex-shrink-0">
-                    {m.member?.shop_name?.[0]?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-[#0F172A]">{m.member?.shop_name || 'Employé'}</p>
-                    <p className="text-xs text-[#64748B]">{m.member?.phone || 'Pas de téléphone'}</p>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                      m.status === 'pending'
-                        ? 'bg-[#FFFBEB] text-[#B45309]'
-                        : 'bg-[#EBF2FF] text-[#1A56DB]'
-                    }`}>
-                      {m.status === 'pending' ? '⏳ En attente' : '✅ Employé actif'}
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => handleRemoveMember(m)}
-                    className="text-xs text-[#DC2626] bg-[#FEF2F2] px-3 py-2 rounded-lg font-medium"
-                  >
-                    Retirer
-                  </button>
-                </div>
-              ))
             )}
           </>
         )}
