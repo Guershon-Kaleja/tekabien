@@ -3,7 +3,11 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import { canAddSale, getPlanLimits } from '../lib/planLimits'
-import { saveSaleOffline, getCleanPendingSales, markSaleSynced, isOnline } from '../lib/offlineDB'
+import {
+  saveSaleOffline, getCleanPendingSales, markSaleSynced,
+  getPendingSalesForDisplay, getFailedSales, clearFailedSales,
+  cleanupOfflineDB, isOnline, formatCacheAge
+} from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -36,6 +40,7 @@ export default function Ventes() {
   const [showOnlineBanner, setShowOnlineBanner] = useState(true)
   const [pendingCount, setPendingCount] = useState(0)
   const [allSales, setAllSales] = useState([])
+  const [offlineSales, setOfflineSales] = useState([])
   const [salesLoading, setSalesLoading] = useState(false)
   const [historyFilter, setHistoryFilter] = useState('today')
   const [historyCustomStart, setHistoryCustomStart] = useState('')
@@ -43,6 +48,9 @@ export default function Ventes() {
   const [showHistoryCustom, setShowHistoryCustom] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(null)
   const [cancelling, setCancelling] = useState(false)
+  const [failedSales, setFailedSales] = useState([])
+  const [showFailedAlert, setShowFailedAlert] = useState(false)
+  const [syncError, setSyncError] = useState('')
 
   const paymentLabel = (method) => ({
     cash: 'Cash', airtel: 'Airtel Money',
@@ -54,7 +62,7 @@ export default function Ventes() {
     orange: '#F97316', mpesa: '#8B5CF6', credit: '#F5A623'
   })[method] || '#64748B'
 
- const syncPendingSales = async (uid) => {
+  const syncPendingSales = async (uid) => {
     try {
       const id = uid || userId
       if (!id) { setPendingCount(0); return }
@@ -62,8 +70,27 @@ export default function Ventes() {
       const pending = await getCleanPendingSales(id)
       if (pending.length === 0) { setPendingCount(0); return }
 
+      let syncErrors = 0
+
       for (const { local_id, saleData } of pending) {
+
+        // Vérifier le stock réel avant sync pour éviter les conflits
+        if (saleData.product_id) {
+          const { data: product } = await supabase
+            .from('products').select('quantity')
+            .eq('id', saleData.product_id).eq('user_id', id).single()
+
+          if (product && product.quantity < saleData.quantity) {
+            // Stock insuffisant — marquer comme échec
+            setSyncError(`⚠️ Stock insuffisant pour "${saleData.product_name}" — vente annulée`)
+            syncErrors++
+            await markSaleSynced(local_id) // marquer comme traité pour éviter boucle
+            continue
+          }
+        }
+
         const { error: saleError } = await supabase.from('sales').insert(saleData)
+
         if (!saleError) {
           await markSaleSynced(local_id)
 
@@ -91,10 +118,8 @@ export default function Ventes() {
             })
 
             const { data: customer } = await supabase
-              .from('customers')
-              .select('total_debt')
-              .eq('id', saleData.customer_id)
-              .single()
+              .from('customers').select('total_debt')
+              .eq('id', saleData.customer_id).single()
 
             if (customer) {
               await supabase.from('customers')
@@ -102,9 +127,23 @@ export default function Ventes() {
                 .eq('id', saleData.customer_id)
             }
           }
+        } else {
+          // Échec de sync — enregistrer l'erreur
+          syncErrors++
+          setSyncError(`❌ Échec sync vente "${saleData.product_name}" — ${saleError.message}`)
         }
       }
+
       setPendingCount(0)
+      setOfflineSales([])
+
+      if (syncErrors === 0) {
+        setSyncError('')
+      }
+
+      // Nettoyer les anciennes données
+      await cleanupOfflineDB()
+
       fetchData()
     } catch (err) {
       console.error('Erreur synchronisation:', err)
@@ -136,15 +175,27 @@ export default function Ventes() {
       .gte('created_at', startOfDay.toISOString())
     if (salesData) setTodaySalesCount(salesData.length)
 
-    const pending = await getCleanPendingSales(user.id)
-    setPendingCount(pending.length)
-    if (pending.length > 0 && navigator.onLine) syncPendingSales(user.id)
+    // Charger les ventes offline pour affichage
+    const pendingSales = await getPendingSalesForDisplay(user.id)
+    setOfflineSales(pendingSales)
+    setPendingCount(pendingSales.length)
+
+    // Vérifier les syncs échouées
+    const failed = await getFailedSales(user.id)
+    if (failed.length > 0) {
+      setFailedSales(failed)
+      setShowFailedAlert(true)
+    }
+
+    if (pendingSales.length > 0 && navigator.onLine) {
+      syncPendingSales(user.id)
+    }
   }
 
   const fetchAllSales = async () => {
     setSalesLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) { setSalesLoading(false); return }
 
     const start = new Date()
     const end = new Date()
@@ -176,6 +227,13 @@ export default function Ventes() {
 
     const { data } = await query
     if (data) setAllSales(data)
+
+    // Ajouter les ventes offline si filtre = aujourd'hui
+    if (historyFilter === 'today') {
+      const pendingSales = await getPendingSalesForDisplay(user.id)
+      setOfflineSales(pendingSales)
+    }
+
     setSalesLoading(false)
   }
 
@@ -187,7 +245,10 @@ export default function Ventes() {
       setTimeout(() => setShowOnlineBanner(false), 3000)
       fetchData()
     }
-    const handleOffline = () => setOnline(false)
+    const handleOffline = () => {
+      setOnline(false)
+      setSyncError('')
+    }
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
     const timer = setTimeout(() => setShowOnlineBanner(false), 3000)
@@ -210,14 +271,22 @@ export default function Ventes() {
     c.name.toLowerCase().includes(clientSearch.toLowerCase())
   )
 
-  const filteredHistory = allSales.filter(s =>
-    s.product_name.toLowerCase().includes(historySearch.toLowerCase()) ||
+  // Fusionner ventes serveur + ventes offline pour l'historique
+  const combinedSales = [
+    ...offlineSales.filter(s => {
+      if (historyFilter !== 'today') return false
+      return true
+    }),
+    ...allSales,
+  ]
+
+  const filteredHistory = combinedSales.filter(s =>
+    s.product_name?.toLowerCase().includes(historySearch.toLowerCase()) ||
     (s.customer_name && s.customer_name.toLowerCase().includes(historySearch.toLowerCase())) ||
     paymentLabel(s.payment_method).toLowerCase().includes(historySearch.toLowerCase())
   )
 
   const total = selected ? selected.price_sell * quantity : 0
-
   const { formatAmount } = useCurrency()
 
   const formatDateTime = (dateStr) => {
@@ -254,8 +323,16 @@ export default function Ventes() {
     }
 
     if (!isOnline()) {
-      await saveSaleOffline(saleData)
+      const savedSale = await saveSaleOffline(saleData)
       setPendingCount(prev => prev + 1)
+
+      // Ajouter immédiatement dans l'historique offline
+      setOfflineSales(prev => [{
+        ...savedSale,
+        id: savedSale.local_id,
+        isOffline: true,
+      }, ...prev])
+
       setSuccess(true)
       setTodaySalesCount(prev => prev + 1)
       setProducts(prev => prev.map(p =>
@@ -299,6 +376,13 @@ export default function Ventes() {
   }
 
   const handleCancelSale = async (sale) => {
+    // Empêcher annulation d'une vente offline
+    if (sale.isOffline) {
+      setShowCancelConfirm(null)
+      setError('Impossible d\'annuler une vente hors ligne — attends la synchronisation')
+      return
+    }
+
     setCancelling(true)
     try {
       const { error } = await supabase.from('sales').delete().eq('id', sale.id)
@@ -338,9 +422,11 @@ export default function Ventes() {
   ]
 
   const limitReached = !canAddSale(userPlan, todaySalesCount)
-  const totalHistory = filteredHistory.reduce((sum, s) => sum + s.total, 0)
+  const totalHistory = filteredHistory
+    .filter(s => !s.isOffline)
+    .reduce((sum, s) => sum + s.total, 0)
   const getInitials = (name) =>
-    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-8">
@@ -357,17 +443,22 @@ export default function Ventes() {
           + Nouvelle vente
         </button>
         <button
-          onClick={() => setActiveTab('history')}
+          onClick={() => { setActiveTab('history'); fetchAllSales() }}
           className={`flex-1 py-3 text-xs font-semibold transition-colors ${
             activeTab === 'history' ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]' : 'text-[#64748B]'
           }`}
         >
-          📋 Historique
+          📋 Historique {pendingCount > 0 && (
+            <span className="ml-1 bg-[#F5A623] text-white text-xs px-1.5 py-0.5 rounded-full">
+              +{pendingCount}
+            </span>
+          )}
         </button>
       </div>
 
       {activeTab === 'new' && (
         <>
+          {/* Bannières connexion */}
           {!online ? (
             <div className="bg-[#FFFBEB] border-b border-yellow-200 px-4 py-2 flex items-center gap-2">
               <span className="text-sm">📶</span>
@@ -383,9 +474,9 @@ export default function Ventes() {
             </div>
           ) : pendingCount > 0 ? (
             <div className="bg-[#EBF2FF] border-b border-blue-200 px-4 py-2 flex items-center gap-2">
-              <span className="text-sm">🔄</span>
+              <div className="w-3 h-3 border-2 border-[#1A56DB] border-t-transparent rounded-full animate-spin flex-shrink-0" />
               <p className="text-xs text-[#1A56DB] font-medium">
-                {pendingCount} vente{pendingCount > 1 ? 's' : ''} en cours de synchronisation...
+                Synchronisation de {pendingCount} vente{pendingCount > 1 ? 's' : ''}...
               </p>
             </div>
           ) : showOnlineBanner ? (
@@ -396,6 +487,38 @@ export default function Ventes() {
               </p>
             </div>
           ) : null}
+
+          {/* Alerte sync échouée */}
+          {syncError && (
+            <div className="bg-[#FEF2F2] border-b border-red-200 px-4 py-2 flex items-center justify-between gap-2">
+              <p className="text-xs text-[#DC2626] font-medium flex-1">{syncError}</p>
+              <button onClick={() => setSyncError('')} className="text-[#DC2626] font-bold">✕</button>
+            </div>
+          )}
+
+          {/* Alerte ventes échouées */}
+          {showFailedAlert && failedSales.length > 0 && (
+            <div className="bg-[#FEF2F2] border-b border-red-200 px-4 py-3">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs font-semibold text-[#DC2626]">
+                  ⚠️ {failedSales.length} vente{failedSales.length > 1 ? 's' : ''} non synchronisée{failedSales.length > 1 ? 's' : ''}
+                </p>
+                <button
+                  onClick={async () => {
+                    await clearFailedSales()
+                    setShowFailedAlert(false)
+                    setFailedSales([])
+                  }}
+                  className="text-xs text-[#DC2626] font-medium"
+                >
+                  Effacer
+                </button>
+              </div>
+              <p className="text-xs text-[#64748B]">
+                Certaines ventes n'ont pas pu être enregistrées. Vérifie ta connexion.
+              </p>
+            </div>
+          )}
 
           {limitReached && (
             <div className="bg-[#FEF2F2] px-4 py-3 flex items-center justify-between border-b border-red-200">
@@ -447,14 +570,8 @@ export default function Ventes() {
             </div>
 
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
-              {search ? 'Résultats' : 'Produits récents'}
+              {search ? 'Résultats' : 'Produits'}
             </p>
-
-            {!selected && !search && products.length > 0 && (
-              <p className="text-xs text-[#1A56DB] mb-3 flex items-center gap-1">
-                <span>👆</span> Appuie sur un produit pour l'ajouter à la vente
-              </p>
-            )}
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-3">
@@ -622,7 +739,7 @@ export default function Ventes() {
 
           <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 flex items-center justify-between">
             <div>
-              <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Total</p>
+              <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Total encaissé</p>
               <p className="text-xl font-bold text-[#1A56DB]">{formatAmount(totalHistory)}</p>
             </div>
             <div className="text-right">
@@ -630,6 +747,16 @@ export default function Ventes() {
               <p className="text-xl font-bold text-[#0F172A]">{filteredHistory.length}</p>
             </div>
           </div>
+
+          {/* Bannière ventes offline en attente */}
+          {offlineSales.length > 0 && (
+            <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-3 flex items-center gap-2">
+              <span className="text-sm">⏳</span>
+              <p className="text-xs text-[#B45309] font-medium">
+                {offlineSales.length} vente{offlineSales.length > 1 ? 's' : ''} en attente de synchronisation
+              </p>
+            </div>
+          )}
 
           <div className="flex gap-2 mb-3">
             {[
@@ -642,11 +769,8 @@ export default function Ventes() {
                 key={f.id}
                 onClick={() => {
                   setHistoryFilter(f.id)
-                  if (f.id === 'custom') {
-                    setShowHistoryCustom(true)
-                  } else {
-                    setShowHistoryCustom(false)
-                  }
+                  if (f.id === 'custom') setShowHistoryCustom(true)
+                  else setShowHistoryCustom(false)
                 }}
                 className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
                   historyFilter === f.id
@@ -684,7 +808,11 @@ export default function Ventes() {
             </div>
           ) : (
             filteredHistory.map((sale) => (
-              <div key={sale.id} className="bg-white rounded-xl border border-gray-200 p-3 mb-2">
+              <div
+                key={sale.id || sale.local_id}
+                className="bg-white rounded-xl border border-gray-200 p-3 mb-2"
+                style={{ borderLeft: sale.isOffline ? '3px solid #F5A623' : '3px solid #E2E8F0' }}
+              >
                 <div className="flex items-center gap-3">
                   <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
@@ -701,7 +829,12 @@ export default function Ventes() {
                       <p className="text-xs text-[#F5A623] font-medium">👤 {sale.customer_name}</p>
                     )}
                     <p className="text-xs text-[#64748B]">Qté : {sale.quantity}</p>
-                    {sale.encaissee === false && (
+                    {sale.isOffline && (
+                      <span className="text-xs bg-[#FFFBEB] text-[#B45309] px-2 py-0.5 rounded-full font-medium mt-1 inline-block">
+                        📶 En attente de sync
+                      </span>
+                    )}
+                    {sale.encaissee === false && !sale.isOffline && (
                       <span className="text-xs bg-[#FFFBEB] text-[#B45309] px-2 py-0.5 rounded-full font-medium mt-1 inline-block">
                         ⏳ En attente d'encaissement
                       </span>
@@ -709,12 +842,14 @@ export default function Ventes() {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <span className="text-sm font-bold text-[#1A56DB]">{formatAmount(sale.total)}</span>
-                    <button
-                      onClick={() => setShowCancelConfirm(sale)}
-                      className="text-xs text-[#DC2626] bg-[#FEF2F2] px-2 py-1 rounded-lg font-medium"
-                    >
-                      🗑️ Annuler
-                    </button>
+                    {!sale.isOffline && (
+                      <button
+                        onClick={() => setShowCancelConfirm(sale)}
+                        className="text-xs text-[#DC2626] bg-[#FEF2F2] px-2 py-1 rounded-lg font-medium"
+                      >
+                        🗑️ Annuler
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -760,7 +895,7 @@ export default function Ventes() {
         </div>
       )}
 
-      {/* Modal date personnalisée historique — bottom sheet */}
+      {/* Modal date personnalisée */}
       {showHistoryCustom && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full px-5 pt-5 pb-10">
@@ -785,7 +920,7 @@ export default function Ventes() {
             </div>
             <div className="mb-6">
               <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
-             <input
+              <input
                 type="date"
                 value={historyCustomEnd}
                 onChange={(e) => setHistoryCustomEnd(e.target.value)}
