@@ -16,6 +16,10 @@ export default function Login() {
     password: '',
     confirm_password: '',
   })
+  const [signupAttempts, setSignupAttempts] = useState(0)
+  const [signupBlocked, setSignupBlocked] = useState(false)
+  const [loginAttempts, setLoginAttempts] = useState(0)
+  const [loginBlocked, setLoginBlocked] = useState(false)
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -26,7 +30,7 @@ export default function Login() {
   }
 
   const validatePhone = (phone) => {
-    if (!phone) return true // optionnel
+    if (!phone) return true
     const clean = normalizePhone(phone)
     if (!/^\d+$/.test(phone.replace(/\s/g, '').replace('+', ''))) return false
     if (clean.length !== 10) return false
@@ -39,7 +43,22 @@ export default function Login() {
     setError('')
   }
 
+  const blockAfterAttempts = (attempts, setAttempts, setBlocked, max = 3, duration = 60000) => {
+    const newCount = attempts + 1
+    setAttempts(newCount)
+    if (newCount >= max) {
+      setBlocked(true)
+      setTimeout(() => {
+        setBlocked(false)
+        setAttempts(0)
+      }, duration)
+    }
+    return newCount
+  }
+
   const handleSignup = async () => {
+    if (signupBlocked) return
+
     if (!form.shop_name || form.shop_name.trim().length < 2) {
       setError('Le nom de ta boutique doit avoir au moins 2 caractères')
       return
@@ -77,6 +96,7 @@ export default function Login() {
         setError('Cet email est déjà utilisé — connecte-toi')
       } else {
         setError(error.message)
+        blockAfterAttempts(signupAttempts, setSignupAttempts, setSignupBlocked)
       }
       setLoading(false)
       return
@@ -99,6 +119,8 @@ export default function Login() {
   }
 
   const handleLogin = async () => {
+    if (loginBlocked) return
+
     if (!form.email || !emailRegex.test(form.email)) {
       setError('Entre une adresse email valide')
       return
@@ -108,12 +130,15 @@ export default function Login() {
       return
     }
     setLoading(true)
+
     const { error } = await supabase.auth.signInWithPassword({
       email: form.email.trim().toLowerCase(),
       password: form.password,
     })
+
     if (error) {
       setError('Email ou mot de passe incorrect')
+      blockAfterAttempts(loginAttempts, setLoginAttempts, setLoginBlocked, 5, 120000)
     }
     setLoading(false)
   }
@@ -205,7 +230,15 @@ export default function Login() {
               <p className="text-xs text-[#16A34A] font-medium">30 jours gratuits — aucune carte requise</p>
             </div>
 
-            {error && (
+            {signupBlocked && (
+              <div className="bg-[#FEF2F2] border border-red-200 rounded-xl p-3 mb-4">
+                <p className="text-xs text-[#DC2626] font-medium">
+                  ⛔ Trop de tentatives — attends 1 minute avant de réessayer
+                </p>
+              </div>
+            )}
+
+            {error && !signupBlocked && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-red-600">{error}</p>
               </div>
@@ -221,7 +254,8 @@ export default function Login() {
                   value={form.shop_name}
                   onChange={handleChange}
                   placeholder="Ex: Boutique Mama Jeanne"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={signupBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
               </div>
               <div>
@@ -233,7 +267,8 @@ export default function Login() {
                   value={form.phone}
                   onChange={handleChange}
                   placeholder="Ex: 0891234567"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={signupBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
                 <p className="text-xs text-[#64748B] mt-1">Airtel, Orange, M-Pesa ou Africell</p>
               </div>
@@ -246,7 +281,8 @@ export default function Login() {
                   value={form.email}
                   onChange={handleChange}
                   placeholder="ton@email.com"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={signupBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
               </div>
               <div>
@@ -259,7 +295,8 @@ export default function Login() {
                   value={form.password}
                   onChange={handleChange}
                   placeholder="Minimum 6 caractères"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={signupBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
               </div>
               <div>
@@ -272,7 +309,8 @@ export default function Login() {
                   value={form.confirm_password}
                   onChange={handleChange}
                   placeholder="Répète ton mot de passe"
-                  className={`w-full border rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] ${
+                  disabled={signupBlocked}
+                  className={`w-full border rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50 ${
                     form.confirm_password && form.password !== form.confirm_password
                       ? 'border-[#DC2626]'
                       : 'border-gray-200'
@@ -289,10 +327,13 @@ export default function Login() {
 
             <button
               onClick={handleSignup}
-              disabled={loading}
+              disabled={loading || signupBlocked}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-5 disabled:opacity-50"
             >
-              {loading ? 'Création...' : 'Créer mon compte gratuit'}
+              {signupBlocked
+                ? '⛔ Trop de tentatives — attends 1 minute'
+                : loading ? 'Création...' : 'Créer mon compte gratuit'
+              }
             </button>
 
             <p className="text-center text-xs text-[#64748B] mt-4">
@@ -306,7 +347,16 @@ export default function Login() {
 
         {tab === 'login' && (
           <div className="p-6">
-            {error && (
+
+            {loginBlocked && (
+              <div className="bg-[#FEF2F2] border border-red-200 rounded-xl p-3 mb-4">
+                <p className="text-xs text-[#DC2626] font-medium">
+                  ⛔ Trop de tentatives — attends 2 minutes avant de réessayer
+                </p>
+              </div>
+            )}
+
+            {error && !loginBlocked && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-red-600">{error}</p>
               </div>
@@ -322,7 +372,8 @@ export default function Login() {
                   value={form.email}
                   onChange={handleChange}
                   placeholder="ton@email.com"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={loginBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
               </div>
               <div>
@@ -336,7 +387,8 @@ export default function Login() {
                   onChange={handleChange}
                   onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                   placeholder="Ton mot de passe"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                  disabled={loginBlocked}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
                 />
               </div>
             </div>
@@ -352,10 +404,13 @@ export default function Login() {
 
             <button
               onClick={handleLogin}
-              disabled={loading}
+              disabled={loading || loginBlocked}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
             >
-              {loading ? 'Connexion...' : 'Se connecter'}
+              {loginBlocked
+                ? '⛔ Trop de tentatives — attends 2 minutes'
+                : loading ? 'Connexion...' : 'Se connecter'
+              }
             </button>
 
             <p className="text-center text-xs text-[#64748B] mt-4">
