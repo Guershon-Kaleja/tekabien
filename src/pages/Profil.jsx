@@ -428,7 +428,6 @@ export default function Profil() {
                     'Produits et clients illimités',
                     'Rapports détaillés avec graphiques',
                     'Export PDF pour la comptabilité',
-                    'Mode offline complet',
                   ].map((a, i) => (
                     <p key={i} className="text-xs text-[#64748B] flex items-center gap-2">
                       <span className="text-[#16A34A]">✓</span> {a}

@@ -90,20 +90,22 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
-        <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
-        <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
-        <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
-        <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
-        <Route path="/tb-admin-2025" element={<Admin />} />
-        <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
-        <Route path="/expired" element={<Expired />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
-      </Routes>
+      <div className="max-w-md mx-auto relative min-h-screen bg-[#EEF2F7] overflow-x-hidden">
+        <Routes>
+          <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+          <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
+          <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
+          <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
+          <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
+          <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
+          <Route path="/tb-admin-2025" element={<Admin />} />
+          <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
+          <Route path="/expired" element={<Expired />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
+        </Routes>
+      </div>
     </BrowserRouter>
   )
 }
