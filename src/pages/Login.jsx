@@ -98,16 +98,29 @@ export default function Login() {
     let emailToUse = form.email.trim().toLowerCase()
 
     // Si ce n'est pas un email → chercher par numéro
-    if (!emailRegex.test(form.email)) {
-      const cleanPhone = form.email.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-      const normalized = cleanPhone.length === 9 && !cleanPhone.startsWith('0')
-        ? '0' + cleanPhone : cleanPhone
+   if (!emailRegex.test(form.email)) {
+      const raw = form.email.replace(/\s/g, '')
+      
+      // Générer plusieurs formats possibles pour chercher
+      const formats = []
+      
+      // Format brut nettoyé
+      let clean = raw.replace('+243', '').replace('+', '')
+      if (clean.startsWith('0')) formats.push(clean) // 0975926833
+      if (!clean.startsWith('0')) formats.push('0' + clean) // ajouter le 0
+      formats.push('+243' + clean.replace(/^0/, '')) // +243975926833
+      formats.push(raw) // format original
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('email')
-        .eq('phone', normalized)
-        .maybeSingle()
+      // Chercher avec tous les formats
+      let userData = null
+      for (const fmt of formats) {
+        const { data } = await supabase
+          .from('users')
+          .select('email')
+          .eq('phone', fmt)
+          .maybeSingle()
+        if (data?.email) { userData = data; break }
+      }
 
       if (!userData?.email) {
         setError('Numéro non trouvé — essaie avec ton email')
