@@ -356,14 +356,14 @@ export default function Profil() {
                 <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide flex-1">
                   Fonctionnalités
                 </p>
-                <div className="flex gap-6">
-                  <p className="text-xs font-bold text-[#64748B] w-10 text-center">Gratuit</p>
-                  <p className="text-xs font-bold text-[#16A34A] w-10 text-center">Pro</p>
+                <div className="flex gap-3">
+                  <p className="text-xs font-bold text-[#64748B] w-16 text-center">Gratuit</p>
+                  <p className="text-xs font-bold text-[#16A34A] w-16 text-center">Pro</p>
                 </div>
               </div>
 
               {[
-                { feature: 'Ventes par jour', free: '10 max', pro: 'Illimitées' },
+                { feature: 'Ventes par jour', free: '10/jour', pro: 'Illimitées' },
                 { feature: 'Produits', free: '5 max', pro: 'Illimités' },
                 { feature: 'Clients', free: '3 max', pro: 'Illimités' },
                 { feature: 'Rapports complets', free: false, pro: true },
@@ -371,15 +371,15 @@ export default function Profil() {
               ].map((f, i) => (
                 <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
-                  <div className="flex gap-6">
-                    <span className={`text-xs w-10 text-center font-medium ${
+                  <div className="flex gap-3">
+                    <span className={`text-xs w-16 text-center font-medium ${
                       f.free === true ? 'text-[#16A34A]' :
                       f.free === false ? 'text-gray-300' :
                       'text-[#64748B]'
                     }`}>
                       {f.free === true ? '✓' : f.free === false ? '✗' : f.free}
                     </span>
-                    <span className={`text-xs w-10 text-center font-medium ${
+                    <span className={`text-xs w-16 text-center font-medium ${
                       f.pro === true ? 'text-[#16A34A]' :
                       f.pro === false ? 'text-gray-300' :
                       'text-[#16A34A]'
@@ -392,9 +392,9 @@ export default function Profil() {
 
               <div className="flex items-center mt-3 pt-2 border-t border-gray-100">
                 <p className="text-xs font-semibold text-[#0F172A] flex-1">Prix/mois</p>
-                <div className="flex gap-6">
-                  <span className="text-xs font-bold text-[#64748B] w-10 text-center">0$</span>
-                  <span className="text-xs font-bold text-[#16A34A] w-10 text-center">5$</span>
+                <div className="flex gap-3">
+                  <span className="text-xs font-bold text-[#64748B] w-16 text-center">0$</span>
+                  <span className="text-xs font-bold text-[#16A34A] w-16 text-center">5$</span>
                 </div>
               </div>
             </div>
