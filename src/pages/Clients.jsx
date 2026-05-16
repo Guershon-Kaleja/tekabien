@@ -22,10 +22,11 @@ export default function Clients() {
   const [showPayForm, setShowPayForm] = useState(false)
   const [showEditDebt, setShowEditDebt] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showDeleteClient, setShowDeleteClient] = useState(null)
 
   const [selectedClient, setSelectedClient] = useState(null)
-  const [form, setForm] = useState({ name: '', phone: '' })
-  const [editForm, setEditForm] = useState({ name: '', phone: '' })
+  const [form, setForm] = useState({ name: '' })
+  const [editForm, setEditForm] = useState({ name: '' })
   const [debtForm, setDebtForm] = useState({ amount: '', note: '' })
   const [payForm, setPayForm] = useState({ amount: '', note: '' })
   const [editDebtAmount, setEditDebtAmount] = useState('')
@@ -64,48 +65,40 @@ export default function Clients() {
     if (data) setDebtHistory(data)
   }
 
-  const normalizePhone = (phone) => {
-    const clean = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-    if (clean.length === 9 && !clean.startsWith('0')) return '0' + clean
-    return clean
-  }
-
   const handleAddClient = async () => {
     if (!canAddClient(userPlan, clients.length)) {
       setFormErrors({ name: `Limite atteinte — ${getPlanLimits(userPlan).maxClients} clients max. Passe au Pro.` })
       return
     }
-    const normalizedForm = { ...form, phone: form.phone ? normalizePhone(form.phone) : '' }
-    const errors = validateClient(normalizedForm)
-    if (Object.keys(errors).length > 0) { setFormErrors(errors); return }
+    if (!form.name || form.name.trim().length < 2) {
+      setFormErrors({ name: 'Entre le nom du client' })
+      return
+    }
     setFormErrors({})
 
     const { error } = await supabase.from('customers').insert({
       user_id: userId,
-      name: sanitize(normalizedForm.name),
-      phone: sanitize(normalizedForm.phone),
+      name: sanitize(form.name.trim()),
       total_debt: 0,
       total_paid: 0,
     })
     if (!error) {
       setShowForm(false)
-      setForm({ name: '', phone: '' })
+      setForm({ name: '' })
       fetchClients()
     }
   }
 
   const handleEditClient = async () => {
-    const normalizedForm = { ...editForm, phone: editForm.phone ? normalizePhone(editForm.phone) : '' }
-    const errors = validateClient(normalizedForm)
-    if (Object.keys(errors).length > 0) { setEditErrors(errors); return }
+    if (!editForm.name || editForm.name.trim().length < 2) {
+      setEditErrors({ name: 'Entre le nom du client' })
+      return
+    }
     setEditErrors({})
 
     const { error } = await supabase
       .from('customers')
-      .update({
-        name: sanitize(normalizedForm.name),
-        phone: sanitize(normalizedForm.phone),
-      })
+      .update({ name: sanitize(editForm.name.trim()) })
       .eq('id', selectedClient.id)
 
     if (!error) {
@@ -113,6 +106,14 @@ export default function Clients() {
       setSelectedClient(null)
       fetchClients()
     }
+  }
+
+  const handleDeleteClient = async (client) => {
+    await supabase.from('debts').delete().eq('customer_id', client.id)
+    await supabase.from('debt_payments').delete().eq('customer_id', client.id)
+    await supabase.from('customers').delete().eq('id', client.id)
+    setShowDeleteClient(null)
+    fetchClients()
   }
 
   const handleAddDebt = async () => {
@@ -217,14 +218,6 @@ export default function Clients() {
     fetchClients()
   }
 
-  const handleWhatsApp = (client) => {
-    const msg = encodeURIComponent(
-      `Bonjour ${client.name}, nous vous rappelons que vous avez une dette de ${formatAmount(client.total_debt)} à notre boutique. Merci de régulariser dès que possible.`
-    )
-    const phone = client.phone?.replace(/\s/g, '').replace('+', '')
-    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
-  }
-
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
     ' à ' + new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -319,7 +312,6 @@ export default function Clients() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-[#0F172A]">{c.name}</p>
-                  <p className="text-xs text-[#64748B]">{c.phone || 'Pas de téléphone'}</p>
                   {c.total_paid > 0 && (
                     <p className="text-xs text-[#16A34A]">✓ {formatAmount(c.total_paid)} déjà remboursé</p>
                   )}
@@ -336,7 +328,7 @@ export default function Clients() {
                 <button
                   onClick={() => {
                     setSelectedClient(c)
-                    setEditForm({ name: c.name, phone: c.phone || '' })
+                    setEditForm({ name: c.name })
                     setShowEditForm(true)
                   }}
                   className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
@@ -352,6 +344,12 @@ export default function Clients() {
                   className="flex-1 bg-[#F8FAFC] text-[#64748B] rounded-lg py-2 text-xs font-semibold border border-gray-200"
                 >
                   📋 Historique
+                </button>
+                <button
+                  onClick={() => setShowDeleteClient(c)}
+                  className="bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 px-3 text-xs font-semibold"
+                >
+                  🗑️
                 </button>
               </div>
 
@@ -371,24 +369,16 @@ export default function Clients() {
                       ✓ Tout remboursé
                     </button>
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedClient(c)
-                        setEditDebtAmount(c.total_debt.toString())
-                        setShowEditDebt(true)
-                      }}
-                      className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-lg py-2 text-xs font-medium"
-                    >
-                      ✏️ Modifier dette
-                    </button>
-                    <button
-                      onClick={() => handleWhatsApp(c)}
-                      className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
-                    >
-                      💬 WhatsApp
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      setSelectedClient(c)
+                      setEditDebtAmount(c.total_debt.toString())
+                      setShowEditDebt(true)
+                    }}
+                    className="w-full bg-white border border-gray-200 text-[#64748B] rounded-lg py-2 text-xs font-medium"
+                  >
+                    ✏️ Modifier dette
+                  </button>
                 </>
               )}
 
@@ -419,6 +409,7 @@ export default function Clients() {
         </button>
       </div>
 
+      {/* Modal ajout client */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -426,27 +417,15 @@ export default function Clients() {
               <h2 className="text-base font-bold text-[#0F172A]">Nouveau client</h2>
               <button onClick={() => { setShowForm(false); setFormErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom du client</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => { setForm({ ...form, name: e.target.value }); setFormErrors({ ...formErrors, name: null }) }}
-                  placeholder="Ex: Mama Mutombo"
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${formErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
-                />
-                {formErrors.name && <p className="text-xs text-[#DC2626] mt-1">{formErrors.name}</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Téléphone</label>
-                <input
-                  value={form.phone}
-                  onChange={(e) => { setForm({ ...form, phone: e.target.value }); setFormErrors({ ...formErrors, phone: null }) }}
-                  placeholder="Ex: 0891234567"
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${formErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'}`}
-                />
-                {formErrors.phone && <p className="text-xs text-[#DC2626] mt-1">{formErrors.phone}</p>}
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom du client</label>
+              <input
+                value={form.name}
+                onChange={(e) => { setForm({ name: e.target.value }); setFormErrors({}) }}
+                placeholder="Ex: Mama Mutombo"
+                className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${formErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
+              />
+              {formErrors.name && <p className="text-xs text-[#DC2626] mt-1">{formErrors.name}</p>}
             </div>
             <button onClick={handleAddClient} className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4">
               Ajouter le client
@@ -455,6 +434,7 @@ export default function Clients() {
         </div>
       )}
 
+      {/* Modal modifier client */}
       {showEditForm && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -462,25 +442,14 @@ export default function Clients() {
               <h2 className="text-base font-bold text-[#0F172A]">Modifier — {selectedClient.name}</h2>
               <button onClick={() => { setShowEditForm(false); setEditErrors({}) }} className="text-[#64748B] text-xl">✕</button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom</label>
-                <input
-                  value={editForm.name}
-                  onChange={(e) => { setEditForm({ ...editForm, name: e.target.value }); setEditErrors({ ...editErrors, name: null }) }}
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${editErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
-                />
-                {editErrors.name && <p className="text-xs text-[#DC2626] mt-1">{editErrors.name}</p>}
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Téléphone</label>
-                <input
-                  value={editForm.phone}
-                  onChange={(e) => { setEditForm({ ...editForm, phone: e.target.value }); setEditErrors({ ...editErrors, phone: null }) }}
-                  className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${editErrors.phone ? 'border-[#DC2626]' : 'border-gray-200'}`}
-                />
-                {editErrors.phone && <p className="text-xs text-[#DC2626] mt-1">{editErrors.phone}</p>}
-              </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">Nom</label>
+              <input
+                value={editForm.name}
+                onChange={(e) => { setEditForm({ name: e.target.value }); setEditErrors({}) }}
+                className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${editErrors.name ? 'border-[#DC2626]' : 'border-gray-200'}`}
+              />
+              {editErrors.name && <p className="text-xs text-[#DC2626] mt-1">{editErrors.name}</p>}
             </div>
             <button onClick={handleEditClient} className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4">
               Enregistrer les modifications
@@ -489,6 +458,41 @@ export default function Clients() {
         </div>
       )}
 
+      {/* Modal supprimer client */}
+      {showDeleteClient && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="text-center mb-4">
+              <p className="text-3xl mb-3">🗑️</p>
+              <h2 className="text-base font-bold text-[#0F172A]">Supprimer ce client ?</h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                <span className="font-semibold text-[#0F172A]">{showDeleteClient.name}</span> et tout son historique seront supprimés définitivement.
+              </p>
+              {showDeleteClient.total_debt > 0 && (
+                <p className="text-xs text-[#DC2626] mt-2 font-medium">
+                  ⚠️ Ce client a une dette de {formatAmount(showDeleteClient.total_debt)}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteClient(null)}
+                className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() => handleDeleteClient(showDeleteClient)}
+                className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ajouter dette */}
       {showDebtForm && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -502,7 +506,7 @@ export default function Clients() {
                 <input
                   type="number"
                   value={debtForm.amount}
-                  onChange={(e) => { setDebtForm({ ...debtForm, amount: e.target.value }); setDebtErrors({ ...debtErrors, amount: null }) }}
+                  onChange={(e) => { setDebtForm({ ...debtForm, amount: e.target.value }); setDebtErrors({}) }}
                   placeholder="Ex: 5000"
                   className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${debtErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
@@ -525,6 +529,7 @@ export default function Clients() {
         </div>
       )}
 
+      {/* Modal modifier montant dette */}
       {showEditDebt && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -552,6 +557,7 @@ export default function Clients() {
         </div>
       )}
 
+      {/* Modal paiement partiel */}
       {showPayForm && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5">
@@ -568,7 +574,7 @@ export default function Clients() {
                 <input
                   type="number"
                   value={payForm.amount}
-                  onChange={(e) => { setPayForm({ ...payForm, amount: e.target.value }); setPayErrors({ ...payErrors, amount: null }) }}
+                  onChange={(e) => { setPayForm({ ...payForm, amount: e.target.value }); setPayErrors({}) }}
                   placeholder={`Max: ${formatAmount(selectedClient.total_debt)}`}
                   className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] ${payErrors.amount ? 'border-[#DC2626]' : 'border-gray-200'}`}
                 />
@@ -607,6 +613,7 @@ export default function Clients() {
         </div>
       )}
 
+      {/* Modal historique */}
       {showHistory && selectedClient && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full p-5 max-h-[70vh] flex flex-col">
