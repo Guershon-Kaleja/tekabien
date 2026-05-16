@@ -104,19 +104,22 @@ export default function Profil() {
   }
 
   const getPlanLabel = (plan) => ({
-    trial: 'Essai gratuit', pro: 'Pro',
-    business: 'Business', free: 'Gratuit',
+    trial: 'Essai gratuit',
+    pro: 'Pro',
+    free: 'Gratuit',
   })[plan] || plan
 
   const getPlanColor = (plan) => ({
-    trial: '#B45309', pro: '#16A34A',
-    business: '#1A56DB', free: '#64748B',
+    trial: '#B45309',
+    pro: '#16A34A',
+    free: '#64748B',
   })[plan] || '#64748B'
 
   const getPlanBg = (plan) => ({
-    trial: '#FFFBEB', pro: '#F0FDF4',
-    business: '#EBF2FF', free: '#F8FAFF',
-  })[plan] || '#F8FAFF'
+    trial: '#FFFBEB',
+    pro: '#F0FDF4',
+    free: '#F8FAFC',
+  })[plan] || '#F8FAFC'
 
   if (loading) {
     return (
@@ -220,7 +223,6 @@ export default function Profil() {
                   <p className="text-xs text-[#64748B] mt-1">L'email ne peut pas être modifié</p>
                 </div>
 
-                {/* Choix de devise */}
                 <div>
                   <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
                     Devise de la boutique
@@ -326,6 +328,7 @@ export default function Profil() {
 
         {activeTab === 'abonnement' && (
           <>
+            {/* Plan actuel */}
             <div
               className="rounded-xl p-4 mb-4 border"
               style={{ background: getPlanBg(userPlan), borderColor: getPlanColor(userPlan) + '40' }}
@@ -341,59 +344,99 @@ export default function Profil() {
               </div>
               {planExpires && (
                 <p className="text-xs text-[#64748B]">
-                  {userPlan === 'trial' ? 'Essai expire le' : 'Renouvellement le'} {new Date(planExpires).toLocaleDateString('fr-FR')}
+                  {userPlan === 'trial' ? 'Essai expire le' : 'Renouvellement le'}{' '}
+                  {new Date(planExpires).toLocaleDateString('fr-FR')}
                 </p>
               )}
             </div>
 
+            {/* Comparaison plans — Free vs Pro uniquement */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
-                Comparaison des plans
-              </p>
+              <div className="flex items-center mb-3">
+                <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide flex-1">
+                  Fonctionnalités
+                </p>
+                <div className="flex gap-6">
+                  <p className="text-xs font-bold text-[#64748B] w-10 text-center">Gratuit</p>
+                  <p className="text-xs font-bold text-[#16A34A] w-10 text-center">Pro</p>
+                </div>
+              </div>
+
               {[
-                { feature: 'Ventes illimitées', free: false, pro: true, business: true },
-                { feature: 'Produits illimités', free: false, pro: true, business: true },
-                { feature: 'Clients illimités', free: false, pro: true, business: true },
-                { feature: 'Rapports complets', free: false, pro: true, business: true },
-                { feature: 'Mode offline', free: true, pro: true, business: true },
-                { feature: 'SMS rappels clients', free: false, pro: false, business: true },
-                { feature: 'Multi-utilisateurs', free: false, pro: false, business: true },
+                { feature: 'Ventes par jour', free: '20 max', pro: 'Illimitées' },
+                { feature: 'Produits', free: '5 max', pro: 'Illimités' },
+                { feature: 'Clients', free: '3 max', pro: 'Illimités' },
+                { feature: 'Rapports complets', free: false, pro: true },
+                { feature: 'Export PDF', free: false, pro: true },
+                { feature: 'Mode offline', free: true, pro: true },
               ].map((f, i) => (
                 <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
-                  <div className="flex gap-4">
-                    <span className={`text-xs w-8 text-center ${f.free ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.free ? '✓' : '✗'}</span>
-                    <span className={`text-xs w-8 text-center ${f.pro ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.pro ? '✓' : '✗'}</span>
-                    <span className={`text-xs w-8 text-center ${f.business ? 'text-[#16A34A]' : 'text-gray-300'}`}>{f.business ? '✓' : '✗'}</span>
+                  <div className="flex gap-6">
+                    <span className={`text-xs w-10 text-center font-medium ${
+                      f.free === true ? 'text-[#16A34A]' :
+                      f.free === false ? 'text-gray-300' :
+                      'text-[#64748B]'
+                    }`}>
+                      {f.free === true ? '✓' : f.free === false ? '✗' : f.free}
+                    </span>
+                    <span className={`text-xs w-10 text-center font-medium ${
+                      f.pro === true ? 'text-[#16A34A]' :
+                      f.pro === false ? 'text-gray-300' :
+                      'text-[#16A34A]'
+                    }`}>
+                      {f.pro === true ? '✓' : f.pro === false ? '✗' : f.pro}
+                    </span>
                   </div>
                 </div>
               ))}
-              <div className="flex items-center mt-3">
-                <p className="text-xs text-[#64748B] flex-1">Prix/mois</p>
-                <div className="flex gap-4">
-                  <span className="text-xs font-bold text-[#64748B] w-8 text-center">0$</span>
-                  <span className="text-xs font-bold text-[#16A34A] w-8 text-center">3$</span>
-                  <span className="text-xs font-bold text-[#1A56DB] w-8 text-center">6$</span>
+
+              <div className="flex items-center mt-3 pt-2 border-t border-gray-100">
+                <p className="text-xs font-semibold text-[#0F172A] flex-1">Prix/mois</p>
+                <div className="flex gap-6">
+                  <span className="text-xs font-bold text-[#64748B] w-10 text-center">0$</span>
+                  <span className="text-xs font-bold text-[#16A34A] w-10 text-center">3$</span>
                 </div>
               </div>
             </div>
 
+            {/* Bouton action */}
             {(userPlan === 'trial' || userPlan === 'free') && (
               <button
                 onClick={() => navigate('/expired')}
-                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm"
+                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
               >
                 Passer au Pro — 3$/mois
               </button>
             )}
 
-            {(userPlan === 'pro' || userPlan === 'business') && (
+            {userPlan === 'pro' && (
               <button
                 onClick={() => navigate('/expired')}
-                className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm"
+                className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-3"
               >
                 Renouveler mon abonnement
               </button>
+            )}
+
+            {/* Avantages Pro */}
+            {(userPlan === 'trial' || userPlan === 'free') && (
+              <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-4">
+                <p className="text-xs font-semibold text-[#16A34A] mb-2">✨ Pourquoi passer au Pro ?</p>
+                <div className="space-y-1.5">
+                  {[
+                    'Ventes illimitées — sans restriction',
+                    'Produits et clients illimités',
+                    'Rapports détaillés avec graphiques',
+                    'Export PDF pour la comptabilité',
+                    'Mode offline complet',
+                  ].map((a, i) => (
+                    <p key={i} className="text-xs text-[#64748B] flex items-center gap-2">
+                      <span className="text-[#16A34A]">✓</span> {a}
+                    </p>
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}
