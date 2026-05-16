@@ -103,11 +103,11 @@ export default function Login() {
     }
 
     if (data.user) {
-      const normalizedPhone = form.phone ? normalizePhone(form.phone) : ''
       await supabase.from('users').insert({
         id: data.user.id,
-        shop_name: sanitize(form.shop_name),
-        phone: sanitize(normalizedPhone),
+        shop_name: sanitize(form.shop_name.trim()),
+        phone: form.phone ? normalizePhone(form.phone) : '',
+        email: form.email.trim().toLowerCase(), // ← ajouter
         language: 'fr',
         role: 'user',
         plan: 'trial',
@@ -131,10 +131,8 @@ export default function Login() {
   }
 
   const handleLogin = async () => {
-    if (loginBlocked) return
-
-    if (!form.email || !emailRegex.test(form.email)) {
-      setError('Entre une adresse email valide')
+    if (!form.email) {
+      setError('Entre ton email ou numéro de téléphone')
       return
     }
     if (!form.password) {
@@ -142,15 +140,38 @@ export default function Login() {
       return
     }
     setLoading(true)
+    setError('')
+
+    let emailToUse = form.email.trim().toLowerCase()
+
+    // Si ce n'est pas un email → chercher par numéro
+    if (!emailRegex.test(form.email)) {
+      const cleanPhone = form.email.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+      const normalized = cleanPhone.length === 9 && !cleanPhone.startsWith('0')
+        ? '0' + cleanPhone : cleanPhone
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('email')
+        .eq('phone', normalized)
+        .maybeSingle()
+
+      if (!userData?.email) {
+        setError('Numéro non trouvé — essaie avec ton email')
+        setLoading(false)
+        return
+      }
+
+      emailToUse = userData.email
+    }
 
     const { error } = await supabase.auth.signInWithPassword({
-      email: form.email.trim().toLowerCase(),
+      email: emailToUse,
       password: form.password,
     })
 
     if (error) {
-      setError('Email ou mot de passe incorrect')
-      blockAfterAttempts(loginAttempts, setLoginAttempts, setLoginBlocked, 5, 120000)
+      setError('Email/numéro ou mot de passe incorrect')
     }
     setLoading(false)
   }
@@ -272,16 +293,14 @@ export default function Login() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Numéro de téléphone (optionnel)
-                </label>
-                <input
-                  name="phone"
-                  value={form.phone}
-                  onChange={handleChange}
-                  placeholder="Ex: 0891234567"
-                  disabled={signupBlocked}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB] disabled:opacity-50"
-                />
+                    Email ou numéro de téléphone
+                  </label>
+                  <input
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="ton@email.com ou 0891234567"
+                  />
                 <p className="text-xs text-[#64748B] mt-1">Airtel, Orange, M-Pesa ou Africell</p>
               </div>
               <div>
