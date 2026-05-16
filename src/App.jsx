@@ -52,7 +52,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-        <Route path="/onboarding" element={session ? <Onboarding /> : <Navigate to="/login" />} />
+        {/* Onboarding accessible sans session — délai de détection session après inscription */}
+        <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
         <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
         <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />

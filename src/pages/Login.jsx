@@ -113,7 +113,19 @@ export default function Login() {
         plan: 'trial',
         plan_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       })
-      navigate('/onboarding')
+
+      // Attendre que la session soit active avant de naviguer
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        navigate('/onboarding')
+      } else {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (session) {
+            subscription.unsubscribe()
+            navigate('/onboarding')
+          }
+        })
+      }
     }
     setLoading(false)
   }
