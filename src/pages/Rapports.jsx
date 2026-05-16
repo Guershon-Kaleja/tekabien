@@ -33,6 +33,13 @@ export default function Rapports() {
     salesByDay: [],
   })
 
+  const { formatAmount, currency } = useCurrency()
+
+  const formatPDF = (amount) => {
+    if (currency === 'USD') return '$' + parseFloat(amount).toFixed(2)
+    return new Intl.NumberFormat('en-US').format(Math.round(amount)) + ' FC'
+  }
+
   useEffect(() => {
     if (period !== 'custom') fetchStats()
   }, [period])
@@ -157,8 +164,6 @@ export default function Rapports() {
     fetchStats()
   }
 
-  const { formatAmount } = useCurrency()
-
   const exportPDF = async () => {
     if (userPlan === 'free' || userPlan === 'trial') {
       alert('Export PDF disponible uniquement pour les plans Pro et Business.')
@@ -191,14 +196,17 @@ export default function Rapports() {
 
       doc.setFontSize(9)
       doc.setFont('helvetica', 'normal')
-      doc.text(`Rapport — ${getPeriodLabel()}`, pageWidth - margin, 32, { align: 'right' })
+      doc.text(`Rapport -- ${getPeriodLabel()}`, pageWidth - margin, 32, { align: 'right' })
 
       y = 50
 
       // Date de génération
       doc.setTextColor(100, 116, 139)
       doc.setFontSize(8)
-      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`, margin, y)
+      doc.text(
+        `Genere le ${new Date().toLocaleDateString('fr-FR')} a ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+        margin, y
+      )
       y += 10
 
       // Résumé financier
@@ -208,12 +216,12 @@ export default function Rapports() {
       doc.setTextColor(15, 23, 42)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
-      doc.text('Résumé financier', margin + 5, y + 8)
+      doc.text('Resume financier', margin + 5, y + 8)
 
       const cols = [
-        { label: 'Encaissé', value: formatAmount(stats.totalSales), color: [26, 86, 219] },
-        { label: 'Coût achat', value: formatAmount(stats.totalCost), color: [245, 166, 35] },
-        { label: 'Dépenses', value: formatAmount(stats.totalExpenses), color: [220, 38, 38] },
+        { label: 'Encaisse', value: formatPDF(stats.totalSales), color: [26, 86, 219] },
+        { label: 'Cout achat', value: formatPDF(stats.totalCost), color: [245, 166, 35] },
+        { label: 'Depenses', value: formatPDF(stats.totalExpenses), color: [220, 38, 38] },
       ]
 
       cols.forEach((col, i) => {
@@ -227,12 +235,14 @@ export default function Rapports() {
         doc.text(col.value, x, y + 26)
       })
 
-      // Bénéfice net
       const profitColor = stats.netProfit >= 0 ? [22, 163, 74] : [220, 38, 38]
       doc.setTextColor(...profitColor)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
-      doc.text(`Bénéfice net : ${stats.netProfit >= 0 ? '+' : ''}${formatAmount(stats.netProfit)}`, margin + 5, y + 38)
+      doc.text(
+        `Benefice net : ${stats.netProfit >= 0 ? '+' : ''}${formatPDF(stats.netProfit)}`,
+        margin + 5, y + 38
+      )
 
       y += 55
 
@@ -250,9 +260,9 @@ export default function Rapports() {
         doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
         doc.text('Produit', margin + 3, y + 5)
-        doc.text('Qté', margin + 90, y + 5)
+        doc.text('Qte', margin + 90, y + 5)
         doc.text('Marge', margin + 115, y + 5)
-        doc.text('Total ventes', margin + 145, y + 5)
+        doc.text('Total ventes', margin + 150, y + 5)
         y += 7
 
         stats.topProducts.forEach((p, i) => {
@@ -265,9 +275,9 @@ export default function Rapports() {
           doc.text(`${i + 1}. ${p.name}`, margin + 3, y + 5)
           doc.text(p.count.toString(), margin + 90, y + 5)
           doc.setTextColor(22, 163, 74)
-          doc.text(`+${formatAmount(p.margin)}`, margin + 115, y + 5)
+          doc.text(`+${formatPDF(p.margin)}`, margin + 115, y + 5)
           doc.setTextColor(26, 86, 219)
-          doc.text(formatAmount(p.total), margin + 145, y + 5)
+          doc.text(formatPDF(p.total), margin + 150, y + 5)
           y += 7
         })
         y += 8
@@ -302,7 +312,7 @@ export default function Rapports() {
           doc.setFont('helvetica', 'normal')
           doc.text(paymentLabel(pm.method), margin + 3, y + 5)
           doc.setTextColor(26, 86, 219)
-          doc.text(formatAmount(pm.total), margin + 120, y + 5)
+          doc.text(formatPDF(pm.total), margin + 120, y + 5)
           doc.setTextColor(100, 116, 139)
           doc.text(`${((pm.total / totalPM) * 100).toFixed(0)}%`, margin + 160, y + 5)
           y += 7
@@ -317,10 +327,13 @@ export default function Rapports() {
         doc.setTextColor(180, 83, 9)
         doc.setFontSize(9)
         doc.setFont('helvetica', 'bold')
-        doc.text(`⚠ ${stats.creditPending} vente(s) crédit en attente — ${formatAmount(stats.creditAmount)}`, margin + 5, y + 7)
+        doc.text(
+          `${stats.creditPending} vente(s) credit en attente -- ${formatPDF(stats.creditAmount)}`,
+          margin + 5, y + 7
+        )
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
-        doc.text('Ces montants ne sont pas inclus dans le bénéfice net.', margin + 5, y + 13)
+        doc.text('Ces montants ne sont pas inclus dans le benefice net.', margin + 5, y + 13)
         y += 22
       }
 
@@ -331,11 +344,10 @@ export default function Rapports() {
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(8)
       doc.setFont('helvetica', 'normal')
-      doc.text('TekaBien — Fini le cahier, place au digital', margin, pageHeight - 6)
+      doc.text('TekaBien -- Fini le cahier, place au digital', margin, pageHeight - 6)
       doc.text('tekabien.vercel.app', pageWidth - margin, pageHeight - 6, { align: 'right' })
 
-      // Télécharger
-      const filename = `rapport-${shopName.replace(/\s/g, '-')}-${getPeriodLabel().replace(/\s/g, '-')}.pdf`
+      const filename = `rapport-${shopName.replace(/\s/g, '-')}-${getPeriodLabel().replace(/[^a-zA-Z0-9]/g, '-')}.pdf`
       doc.save(filename)
 
     } catch (err) {
@@ -352,7 +364,7 @@ export default function Rapports() {
 
   const paymentLabel = (method) => ({
     cash: 'Cash', airtel: 'Airtel',
-    orange: 'Orange', mpesa: 'M-Pesa', credit: 'Crédit'
+    orange: 'Orange', mpesa: 'M-Pesa', credit: 'Credit'
   })[method] || method
 
   const paymentColor = (method) => ({
@@ -361,7 +373,6 @@ export default function Rapports() {
   })[method] || '#64748B'
 
   const COLORS = ['#16A34A', '#EF4444', '#F97316', '#8B5CF6', '#F5A623', '#1A56DB']
-
   const maxMargin = stats.topProducts[0]?.margin || 1
 
   const getPeriodLabel = () => {
@@ -370,10 +381,10 @@ export default function Rapports() {
     if (period === 'month') return 'Ce mois'
     if (period === 'custom' && customStart) {
       return customEnd && customEnd !== customStart
-        ? `${new Date(customStart).toLocaleDateString('fr-FR')} → ${new Date(customEnd).toLocaleDateString('fr-FR')}`
+        ? `${new Date(customStart).toLocaleDateString('fr-FR')} -> ${new Date(customEnd).toLocaleDateString('fr-FR')}`
         : new Date(customStart).toLocaleDateString('fr-FR')
     }
-    return 'Période'
+    return 'Periode'
   }
 
   return (
@@ -408,7 +419,6 @@ export default function Rapports() {
 
       <div className="px-4 pt-4">
 
-        {/* Filtres période */}
         <div className="flex gap-2 mb-4">
           {[
             { id: 'today', label: "Auj." },
@@ -434,7 +444,6 @@ export default function Rapports() {
           ))}
         </div>
 
-        {/* Bouton export PDF */}
         {!loading && (
           <button
             onClick={exportPDF}
