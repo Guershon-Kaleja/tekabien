@@ -63,10 +63,8 @@ export default function Dashboard() {
       .order('created_at', { ascending: false })
 
     if (salesData) {
-      // Compter uniquement les ventes encaissées
       const encaissees = salesData.filter(s => s.encaissee !== false)
       const credits = salesData.filter(s => s.encaissee === false)
-
       setTodaySales(encaissees.reduce((sum, s) => sum + s.total, 0))
       setSalesCount(encaissees.length)
       setCreditPending(credits.length)
@@ -123,13 +121,13 @@ export default function Dashboard() {
   const getPlanBannerBg = () => {
     if (userPlan === 'trial' && trialDaysLeft <= 5) return 'bg-[#FEF2F2]'
     if (userPlan === 'trial') return 'bg-[#FFFBEB]'
-    if (userPlan === 'pro' || userPlan === 'business') return 'bg-[#F0FDF4]'
+    if (userPlan === 'pro') return 'bg-[#F0FDF4]'
     if (userPlan === 'free') return 'bg-[#F8FAFC]'
     return 'bg-[#FEF2F2]'
   }
 
   const getPlanTextColor = () => {
-    if (userPlan === 'pro' || userPlan === 'business') return 'text-[#16A34A]'
+    if (userPlan === 'pro') return 'text-[#16A34A]'
     if (userPlan === 'trial' && trialDaysLeft <= 5) return 'text-[#DC2626]'
     if (userPlan === 'trial') return 'text-[#B45309]'
     if (userPlan === 'free') return 'text-[#64748B]'
@@ -137,7 +135,7 @@ export default function Dashboard() {
   }
 
   const getPlanIcon = () => {
-    if (userPlan === 'pro' || userPlan === 'business') return '✅'
+    if (userPlan === 'pro') return '✅'
     if (userPlan === 'trial' && trialDaysLeft <= 5) return '⚠️'
     if (userPlan === 'trial') return '🎁'
     if (userPlan === 'free') return '🔒'
@@ -146,7 +144,6 @@ export default function Dashboard() {
 
   const getPlanLabel = () => {
     if (userPlan === 'pro') return 'Plan Pro actif'
-    if (userPlan === 'business') return 'Plan Business actif'
     if (userPlan === 'trial' && trialDaysLeft === 0) return "Ton essai expire aujourd'hui !"
     if (userPlan === 'trial' && trialDaysLeft > 0) return `Il te reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai`
     if (userPlan === 'free') return 'Plan gratuit — fonctionnalités limitées'
@@ -154,11 +151,11 @@ export default function Dashboard() {
   }
 
   const getPlanSub = () => {
-    if ((userPlan === 'pro' || userPlan === 'business') && planExpires) {
+    if (userPlan === 'pro' && planExpires) {
       return `Renouvellement le ${new Date(planExpires).toLocaleDateString('fr-FR')}`
     }
     if (userPlan === 'trial') return 'Passe au Pro pour continuer sans interruption'
-    if (userPlan === 'free') return '20 ventes/j · 5 produits · 3 clients max'
+    if (userPlan === 'free') return '10 ventes/j · 5 produits · 3 clients max'
     return ''
   }
 
@@ -244,11 +241,9 @@ export default function Dashboard() {
             </button>
           )}
 
-          {(userPlan === 'pro' || userPlan === 'business') && (
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${
-              userPlan === 'pro' ? 'bg-[#16A34A] text-white' : 'bg-[#1A56DB] text-white'
-            }`}>
-              {userPlan === 'pro' ? 'PRO' : 'BUSINESS'}
+          {userPlan === 'pro' && (
+            <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#16A34A] text-white">
+              PRO
             </span>
           )}
         </div>
@@ -288,10 +283,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Alertes</p>
-              <p
-                onClick={() => navigate('/stocks')}
-                className="text-xs text-[#1A56DB] cursor-pointer"
-              >
+              <p onClick={() => navigate('/stocks')} className="text-xs text-[#1A56DB] cursor-pointer">
                 Voir tout
               </p>
             </div>
@@ -316,10 +308,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-2 mt-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Dernières ventes</p>
-              <p
-                onClick={() => navigate('/ventes?tab=history')}
-                className="text-xs text-[#1A56DB] cursor-pointer"
-              >
+              <p onClick={() => navigate('/ventes?tab=history')} className="text-xs text-[#1A56DB] cursor-pointer">
                 Voir tout
               </p>
             </div>
