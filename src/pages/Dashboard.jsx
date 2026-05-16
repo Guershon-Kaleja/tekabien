@@ -185,7 +185,9 @@ export default function Dashboard() {
             👥 Invitation reçue
           </p>
           <p className="text-xs text-[#64748B] mb-3">
-            <span className="font-semibold text-[#0F172A]">{pendingInvite.owner?.shop_name}</span> t'a invité à rejoindre son équipe comme employé.
+            <span className="font-semibold text-[#0F172A]">
+              {pendingInvite.owner?.shop_name || 'Une boutique'}
+            </span> t'a invité à rejoindre son équipe comme employé.
           </p>
           <div className="flex gap-2">
             <button

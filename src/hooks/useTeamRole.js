@@ -27,8 +27,14 @@ export default function useTeamRole() {
       const { data: invite } = await supabase
         .from('team_members')
         .select(`
-          id, status, role,
-          owner:owner_id (shop_name)
+          id,
+          status,
+          role,
+          owner_id,
+          owner:owner_id (
+            id,
+            shop_name
+          )
         `)
         .eq('member_id', user.id)
         .eq('status', 'pending')
@@ -45,18 +51,30 @@ export default function useTeamRole() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user || !pendingInvite) return
 
-    await supabase
+    // Mettre à jour le statut dans team_members
+    const { error: updateError } = await supabase
       .from('team_members')
       .update({ status: 'accepted' })
       .eq('id', pendingInvite.id)
 
-    await supabase
+    if (updateError) {
+      console.error('Erreur update team_members:', updateError)
+      return
+    }
+
+    // Mettre à jour le profil de l'employé
+    const { error: userError } = await supabase
       .from('users')
       .update({
         owner_id: pendingInvite.owner_id,
         team_role: 'staff',
       })
       .eq('id', user.id)
+
+    if (userError) {
+      console.error('Erreur update users:', userError)
+      return
+    }
 
     setTeamRole('staff')
     setOwnerId(pendingInvite.owner_id)
