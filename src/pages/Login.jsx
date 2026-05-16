@@ -32,7 +32,7 @@ export default function Login() {
 
   const handleSignup = async () => {
     if (!form.shop_name || form.shop_name.trim().length < 2) {
-      setError('Entre le nom de ta boutique')
+      setError("Entre le nom de ton activité")
       return
     }
     if (!form.email || !emailRegex.test(form.email)) {
@@ -97,8 +97,7 @@ export default function Login() {
 
     let emailToUse = form.email.trim().toLowerCase()
 
-    // Si ce n'est pas un email → chercher par numéro
-   if (!emailRegex.test(form.email)) {
+    if (!emailRegex.test(form.email)) {
       const raw = form.email.replace(/\s/g, '')
       let clean = raw.replace('+243', '').replace('+', '')
       if (!clean.startsWith('0')) clean = '0' + clean
@@ -182,14 +181,14 @@ export default function Login() {
             </div>
             <h1 className="text-2xl font-bold text-[#0F172A] mb-2">TekaBien</h1>
             <p className="text-[#64748B] text-sm mb-6 leading-relaxed">
-              Fini le cahier, place au digital. Gère ta boutique depuis ton téléphone.
+              Fini le cahier, place au digital. Gère ton activité depuis ton téléphone.
             </p>
             <div className="text-left mb-6 space-y-3">
               {[
                 { icon: '🛒', title: 'Enregistre tes ventes', sub: "En 3 clics, plus vite qu'un cahier" },
                 { icon: '📦', title: 'Suis tes stocks', sub: "Alertes automatiques quand c'est bas" },
                 { icon: '👥', title: 'Gère les dettes clients', sub: 'Ne perds plus jamais un franc' },
-                { icon: '📶', title: 'Fonctionne sans internet', sub: 'Même quand le réseau coupe' },
+                { icon: '📊', title: 'Rapports détaillés', sub: 'Suis ta trésorerie en temps réel' },
               ].map((f, i) => (
                 <div key={i} className="flex items-center gap-3 p-3 bg-[#EEF2F7] rounded-xl">
                   <span className="text-xl">{f.icon}</span>
@@ -231,13 +230,13 @@ export default function Login() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                  Nom de ta boutique *
+                  Nom de ton activité *
                 </label>
                 <input
                   name="shop_name"
                   value={form.shop_name}
                   onChange={handleChange}
-                  placeholder="Ex: Boutique Mama Jeanne"
+                  placeholder="Ex: Ventes en ligne, Salon Merveille, Chez Mama Jeanne..."
                   className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
                 />
               </div>
