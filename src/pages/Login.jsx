@@ -111,6 +111,9 @@ export default function Login() {
       formats.push('+243' + clean.replace(/^0/, '')) // +243975926833
       formats.push(raw) // format original
 
+        console.log('raw:', raw, 'clean:', clean, 'formats:', formats) // ← ici
+
+
       // Chercher avec tous les formats
       let userData = null
       for (const fmt of formats) {
@@ -119,6 +122,7 @@ export default function Login() {
           .select('email')
           .eq('phone', fmt)
           .maybeSingle()
+            console.log('raw:', raw, 'clean:', clean, 'formats:', formats) // ← ici
         if (data?.email) { userData = data; break }
       }
 
@@ -129,7 +133,6 @@ export default function Login() {
       }
 
       emailToUse = userData.email
-      console.log('formats testés:', formats)
     }
 
     const { error } = await supabase.auth.signInWithPassword({
