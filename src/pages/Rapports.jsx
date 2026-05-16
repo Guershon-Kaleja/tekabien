@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -6,15 +6,20 @@ import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
+import jsPDF from 'jspdf'
 
 export default function Rapports() {
   const navigate = useNavigate()
   usePlanCheck()
+  const reportRef = useRef(null)
   const [period, setPeriod] = useState('today')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
   const [showCustom, setShowCustom] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [exporting, setExporting] = useState(false)
+  const [shopName, setShopName] = useState('')
+  const [userPlan, setUserPlan] = useState(null)
   const [stats, setStats] = useState({
     totalSales: 0,
     totalCost: 0,
@@ -58,6 +63,16 @@ export default function Rapports() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('shop_name, plan')
+      .eq('id', user.id)
+      .single()
+    if (userData) {
+      setShopName(userData.shop_name)
+      setUserPlan(userData.plan)
+    }
 
     const { start, end } = getDateRange()
 
@@ -144,6 +159,191 @@ export default function Rapports() {
 
   const { formatAmount } = useCurrency()
 
+  const exportPDF = async () => {
+    if (userPlan === 'free' || userPlan === 'trial') {
+      alert('Export PDF disponible uniquement pour les plans Pro et Business.')
+      return
+    }
+
+    setExporting(true)
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageWidth = doc.internal.pageSize.getWidth()
+      const margin = 15
+      let y = 20
+
+      // En-tête
+      doc.setFillColor(26, 86, 219)
+      doc.rect(0, 0, pageWidth, 40, 'F')
+
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text('TekaBien', margin, 16)
+
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.text('Fini le cahier, place au digital', margin, 23)
+
+      doc.setFontSize(12)
+      doc.setFont('helvetica', 'bold')
+      doc.text(shopName, margin, 32)
+
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Rapport — ${getPeriodLabel()}`, pageWidth - margin, 32, { align: 'right' })
+
+      y = 50
+
+      // Date de génération
+      doc.setTextColor(100, 116, 139)
+      doc.setFontSize(8)
+      doc.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`, margin, y)
+      y += 10
+
+      // Résumé financier
+      doc.setFillColor(241, 245, 249)
+      doc.roundedRect(margin, y, pageWidth - margin * 2, 45, 3, 3, 'F')
+
+      doc.setTextColor(15, 23, 42)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Résumé financier', margin + 5, y + 8)
+
+      const cols = [
+        { label: 'Encaissé', value: formatAmount(stats.totalSales), color: [26, 86, 219] },
+        { label: 'Coût achat', value: formatAmount(stats.totalCost), color: [245, 166, 35] },
+        { label: 'Dépenses', value: formatAmount(stats.totalExpenses), color: [220, 38, 38] },
+      ]
+
+      cols.forEach((col, i) => {
+        const x = margin + 5 + i * ((pageWidth - margin * 2 - 10) / 3)
+        doc.setTextColor(...col.color)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'normal')
+        doc.text(col.label, x, y + 18)
+        doc.setFontSize(10)
+        doc.setFont('helvetica', 'bold')
+        doc.text(col.value, x, y + 26)
+      })
+
+      // Bénéfice net
+      const profitColor = stats.netProfit >= 0 ? [22, 163, 74] : [220, 38, 38]
+      doc.setTextColor(...profitColor)
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Bénéfice net : ${stats.netProfit >= 0 ? '+' : ''}${formatAmount(stats.netProfit)}`, margin + 5, y + 38)
+
+      y += 55
+
+      // Top produits
+      if (stats.topProducts.length > 0) {
+        doc.setTextColor(15, 23, 42)
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Top produits (par marge)', margin, y)
+        y += 7
+
+        doc.setFillColor(26, 86, 219)
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Produit', margin + 3, y + 5)
+        doc.text('Qté', margin + 90, y + 5)
+        doc.text('Marge', margin + 115, y + 5)
+        doc.text('Total ventes', margin + 145, y + 5)
+        y += 7
+
+        stats.topProducts.forEach((p, i) => {
+          const bg = i % 2 === 0 ? [248, 250, 252] : [255, 255, 255]
+          doc.setFillColor(...bg)
+          doc.rect(margin, y, pageWidth - margin * 2, 7, 'F')
+          doc.setTextColor(15, 23, 42)
+          doc.setFontSize(8)
+          doc.setFont('helvetica', 'normal')
+          doc.text(`${i + 1}. ${p.name}`, margin + 3, y + 5)
+          doc.text(p.count.toString(), margin + 90, y + 5)
+          doc.setTextColor(22, 163, 74)
+          doc.text(`+${formatAmount(p.margin)}`, margin + 115, y + 5)
+          doc.setTextColor(26, 86, 219)
+          doc.text(formatAmount(p.total), margin + 145, y + 5)
+          y += 7
+        })
+        y += 8
+      }
+
+      // Modes de paiement
+      if (stats.paymentMethods.length > 0) {
+        doc.setTextColor(15, 23, 42)
+        doc.setFontSize(11)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Modes de paiement', margin, y)
+        y += 7
+
+        doc.setFillColor(26, 86, 219)
+        doc.rect(margin, y, pageWidth - margin * 2, 7, 'F')
+        doc.setTextColor(255, 255, 255)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text('Mode', margin + 3, y + 5)
+        doc.text('Montant', margin + 120, y + 5)
+        doc.text('Part', margin + 160, y + 5)
+        y += 7
+
+        const totalPM = stats.paymentMethods.reduce((sum, pm) => sum + pm.total, 0)
+
+        stats.paymentMethods.forEach((pm, i) => {
+          const bg = i % 2 === 0 ? [248, 250, 252] : [255, 255, 255]
+          doc.setFillColor(...bg)
+          doc.rect(margin, y, pageWidth - margin * 2, 7, 'F')
+          doc.setTextColor(15, 23, 42)
+          doc.setFontSize(8)
+          doc.setFont('helvetica', 'normal')
+          doc.text(paymentLabel(pm.method), margin + 3, y + 5)
+          doc.setTextColor(26, 86, 219)
+          doc.text(formatAmount(pm.total), margin + 120, y + 5)
+          doc.setTextColor(100, 116, 139)
+          doc.text(`${((pm.total / totalPM) * 100).toFixed(0)}%`, margin + 160, y + 5)
+          y += 7
+        })
+        y += 8
+      }
+
+      // Ventes crédit en attente
+      if (stats.creditPending > 0) {
+        doc.setFillColor(255, 251, 235)
+        doc.roundedRect(margin, y, pageWidth - margin * 2, 18, 3, 3, 'F')
+        doc.setTextColor(180, 83, 9)
+        doc.setFontSize(9)
+        doc.setFont('helvetica', 'bold')
+        doc.text(`⚠ ${stats.creditPending} vente(s) crédit en attente — ${formatAmount(stats.creditAmount)}`, margin + 5, y + 7)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.text('Ces montants ne sont pas inclus dans le bénéfice net.', margin + 5, y + 13)
+        y += 22
+      }
+
+      // Pied de page
+      const pageHeight = doc.internal.pageSize.getHeight()
+      doc.setFillColor(26, 86, 219)
+      doc.rect(0, pageHeight - 15, pageWidth, 15, 'F')
+      doc.setTextColor(255, 255, 255)
+      doc.setFontSize(8)
+      doc.setFont('helvetica', 'normal')
+      doc.text('TekaBien — Fini le cahier, place au digital', margin, pageHeight - 6)
+      doc.text('tekabien.vercel.app', pageWidth - margin, pageHeight - 6, { align: 'right' })
+
+      // Télécharger
+      const filename = `rapport-${shopName.replace(/\s/g, '-')}-${getPeriodLabel().replace(/\s/g, '-')}.pdf`
+      doc.save(filename)
+
+    } catch (err) {
+      console.error('Erreur export PDF:', err)
+    }
+    setExporting(false)
+  }
+
   const formatFCShort = (amount) => {
     if (amount >= 1000000) return (amount / 1000000).toFixed(1) + 'M'
     if (amount >= 1000) return (amount / 1000).toFixed(0) + 'k'
@@ -220,11 +420,8 @@ export default function Rapports() {
               key={p.id}
               onClick={() => {
                 setPeriod(p.id)
-                if (p.id === 'custom') {
-                  setShowCustom(true)
-                } else {
-                  setShowCustom(false)
-                }
+                if (p.id === 'custom') setShowCustom(true)
+                else setShowCustom(false)
               }}
               className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
                 period === p.id
@@ -237,11 +434,34 @@ export default function Rapports() {
           ))}
         </div>
 
+        {/* Bouton export PDF */}
+        {!loading && (
+          <button
+            onClick={exportPDF}
+            disabled={exporting}
+            className={`w-full rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 mb-4 ${
+              userPlan === 'pro' || userPlan === 'business'
+                ? 'bg-[#0F172A] text-white'
+                : 'bg-gray-100 text-[#64748B] border border-gray-200'
+            } disabled:opacity-50`}
+          >
+            {exporting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Génération du PDF...
+              </>
+            ) : userPlan === 'pro' || userPlan === 'business' ? (
+              '📄 Exporter en PDF'
+            ) : (
+              '📄 Export PDF — Pro uniquement'
+            )}
+          </button>
+        )}
+
         {loading ? (
           <p className="text-center text-[#64748B] text-sm py-8">Chargement...</p>
         ) : (
           <>
-            {/* Ventes crédit en attente */}
             {stats.creditPending > 0 && (
               <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4 flex items-center justify-between">
                 <div>
@@ -261,7 +481,6 @@ export default function Rapports() {
               </div>
             )}
 
-            {/* Graphique ventes par jour */}
             {stats.salesByDay.length > 1 && (
               <>
                 <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
@@ -270,24 +489,9 @@ export default function Rapports() {
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                   <ResponsiveContainer width="100%" height={180}>
                     <BarChart data={stats.salesByDay} margin={{ top: 5, right: 5, bottom: 5, left: 0 }}>
-                      <XAxis
-                        dataKey="day"
-                        tick={{ fontSize: 10, fill: '#64748B' }}
-                        axisLine={false}
-                        tickLine={false}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 10, fill: '#64748B' }}
-                        axisLine={false}
-                        tickLine={false}
-                        tickFormatter={formatFCShort}
-                        width={40}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatAmount(value), 'Ventes']}
-                        labelStyle={{ fontSize: 12 }}
-                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                      />
+                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748B' }} axisLine={false} tickLine={false} tickFormatter={formatFCShort} width={40} />
+                      <Tooltip formatter={(value) => [formatAmount(value), 'Ventes']} labelStyle={{ fontSize: 12 }} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                       <Bar dataKey="total" fill="#1A56DB" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -295,7 +499,6 @@ export default function Rapports() {
               </>
             )}
 
-            {/* Graphique modes de paiement */}
             {stats.paymentMethods.length > 0 && (
               <>
                 <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
@@ -311,16 +514,11 @@ export default function Rapports() {
                         cx="50%"
                         cy="50%"
                         outerRadius={70}
-                        label={({ method, percent }) =>
-                          `${paymentLabel(method)} ${(percent * 100).toFixed(0)}%`
-                        }
+                        label={({ method, percent }) => `${paymentLabel(method)} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
                         {stats.paymentMethods.map((entry, index) => (
-                          <Cell
-                            key={entry.method}
-                            fill={paymentColor(entry.method) || COLORS[index % COLORS.length]}
-                          />
+                          <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(value) => formatAmount(value)} />
@@ -338,7 +536,6 @@ export default function Rapports() {
               </>
             )}
 
-            {/* Top produits */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Top produits (par marge)
             </p>
@@ -366,10 +563,7 @@ export default function Rapports() {
                     <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
-                        style={{
-                          width: `${Math.round((p.margin / maxMargin) * 100)}%`,
-                          background: '#16A34A'
-                        }}
+                        style={{ width: `${Math.round((p.margin / maxMargin) * 100)}%`, background: '#16A34A' }}
                       />
                     </div>
                   </div>
@@ -377,7 +571,6 @@ export default function Rapports() {
               </div>
             )}
 
-            {/* Modes de paiement liste */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Détail des paiements
             </p>
@@ -391,10 +584,7 @@ export default function Rapports() {
               <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                 {stats.paymentMethods.map((pm) => (
                   <div key={pm.method} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ background: paymentColor(pm.method) }}
-                    />
+                    <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: paymentColor(pm.method) }} />
                     <p className="text-sm text-[#0F172A] flex-1">{paymentLabel(pm.method)}</p>
                     <p className="text-sm font-bold text-[#0F172A]">{formatAmount(pm.total)}</p>
                   </div>
@@ -402,7 +592,6 @@ export default function Rapports() {
               </div>
             )}
 
-            {/* Accès rapide */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Accès rapide
             </p>
@@ -429,7 +618,6 @@ export default function Rapports() {
 
       </div>
 
-      {/* Modal sélecteur date — bottom sheet */}
       {showCustom && (
         <div className="fixed inset-0 bg-black/50 flex items-end z-50">
           <div className="bg-white rounded-t-2xl w-full px-5 pt-5 pb-10">
@@ -442,7 +630,6 @@ export default function Rapports() {
                 ✕
               </button>
             </div>
-
             <div className="mb-4">
               <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Du</label>
               <input
@@ -453,7 +640,6 @@ export default function Rapports() {
                 className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
               />
             </div>
-
             <div className="mb-6">
               <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
               <input
@@ -464,7 +650,6 @@ export default function Rapports() {
                 className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
               />
             </div>
-
             <button
               onClick={handleCustomSearch}
               disabled={!customStart}
