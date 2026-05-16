@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
-import useCurrency from '../hooks/useCurrency'
+import useTeamRole from '../hooks/useTeamRole'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   usePlanCheck()
+  const { pendingInvite, acceptInvite, refuseInvite } = useTeamRole()
   const [shopName, setShopName] = useState('')
   const [todaySales, setTodaySales] = useState(0)
   const [salesCount, setSalesCount] = useState(0)
@@ -38,7 +39,7 @@ export default function Dashboard() {
 
     const { data: userData } = await supabase
       .from('users')
-      .select('shop_name, plan, plan_expires')
+      .select('shop_name, plan, plan_expires, team_role, owner_id')
       .eq('id', user.id)
       .single()
 
@@ -55,18 +56,21 @@ export default function Dashboard() {
       }
     }
 
+    // ID effectif — si employé, utilise l'ID du patron
+    const effectiveId = userData?.team_role === 'staff' && userData?.owner_id
+      ? userData.owner_id
+      : user.id
+
     const { data: salesData } = await supabase
       .from('sales')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveId)
       .gte('created_at', startOfDay.toISOString())
       .order('created_at', { ascending: false })
 
     if (salesData) {
-      // Compter uniquement les ventes encaissées
       const encaissees = salesData.filter(s => s.encaissee !== false)
       const credits = salesData.filter(s => s.encaissee === false)
-
       setTodaySales(encaissees.reduce((sum, s) => sum + s.total, 0))
       setSalesCount(encaissees.length)
       setCreditPending(credits.length)
@@ -76,7 +80,7 @@ export default function Dashboard() {
     const { data: expensesData } = await supabase
       .from('expenses')
       .select('amount')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveId)
       .gte('created_at', startOfDay.toISOString())
 
     if (salesData && expensesData) {
@@ -90,7 +94,7 @@ export default function Dashboard() {
     const { data: customersData } = await supabase
       .from('customers')
       .select('total_debt')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveId)
       .gt('total_debt', 0)
 
     if (customersData) {
@@ -101,7 +105,7 @@ export default function Dashboard() {
     const { data: productsData } = await supabase
       .from('products')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveId)
 
     if (productsData) {
       setLowStock(productsData.filter(p => p.quantity <= p.alert_threshold))
@@ -110,7 +114,8 @@ export default function Dashboard() {
     setLoading(false)
   }
 
-  const { formatAmount } = useCurrency()
+  const formatFC = (amount) =>
+    new Intl.NumberFormat('fr-FR').format(Math.round(amount)) + ' FC'
 
   const formatTime = (dateStr) =>
     new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -173,6 +178,32 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
 
+      {/* Notification invitation */}
+      {pendingInvite && (
+        <div className="bg-[#EBF2FF] border-b border-blue-200 px-4 py-3">
+          <p className="text-xs font-semibold text-[#1A56DB] mb-1">
+            👥 Invitation reçue
+          </p>
+          <p className="text-xs text-[#64748B] mb-3">
+            <span className="font-semibold text-[#0F172A]">{pendingInvite.owner?.shop_name}</span> t'a invité à rejoindre son équipe comme employé.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={acceptInvite}
+              className="flex-1 bg-[#1A56DB] text-white rounded-xl py-2 text-xs font-semibold"
+            >
+              ✅ Accepter
+            </button>
+            <button
+              onClick={refuseInvite}
+              className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-2 text-xs font-medium"
+            >
+              ✕ Refuser
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-[#1A56DB] px-4 pt-4 pb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -195,7 +226,7 @@ export default function Dashboard() {
         </div>
         <div className="rounded-xl p-3 border" style={{ background: 'rgba(255,255,255,0.12)', borderColor: 'rgba(255,255,255,0.2)' }}>
           <p className="text-xs uppercase tracking-wide mb-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Ventes encaissées du jour</p>
-          <p className="text-white text-3xl font-bold">{formatAmount(todaySales)}</p>
+          <p className="text-white text-3xl font-bold">{formatFC(todaySales)}</p>
           <div className="flex items-center justify-between mt-1">
             <p className="text-xs" style={{ color: 'rgba(255,255,255,0.7)' }}>{salesCount} ventes encaissées</p>
             {creditPending > 0 && (
@@ -226,9 +257,7 @@ export default function Dashboard() {
             <button
               onClick={() => navigate('/expired')}
               className={`text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap ${
-                trialDaysLeft <= 5
-                  ? 'bg-[#DC2626] text-white'
-                  : 'bg-[#F5A623] text-white'
+                trialDaysLeft <= 5 ? 'bg-[#DC2626] text-white' : 'bg-[#F5A623] text-white'
               }`}
             >
               Passer au Pro
@@ -260,14 +289,14 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Bénéfice net</p>
             <p className={`text-xl font-bold ${netProfit >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'}`}>
-              {formatAmount(netProfit)}
+              {formatFC(netProfit)}
             </p>
             <p className="text-xs text-[#64748B] mt-1">marge - dépenses</p>
           </div>
           <div className="bg-white rounded-xl p-3 border border-gray-200">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1">Clients en dette</p>
             <p className="text-xl font-bold text-[#DC2626]">{debtCount}</p>
-            <p className="text-xs text-[#64748B] mt-1">{formatAmount(totalDebt)} dus</p>
+            <p className="text-xs text-[#64748B] mt-1">{formatFC(totalDebt)} dus</p>
           </div>
         </div>
 
@@ -288,10 +317,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Alertes</p>
-              <p
-                onClick={() => navigate('/stocks')}
-                className="text-xs text-[#1A56DB] cursor-pointer"
-              >
+              <p onClick={() => navigate('/stocks')} className="text-xs text-[#1A56DB] cursor-pointer">
                 Voir tout
               </p>
             </div>
@@ -316,10 +342,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-2 mt-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Dernières ventes</p>
-              <p
-                onClick={() => navigate('/ventes?tab=history')}
-                className="text-xs text-[#1A56DB] cursor-pointer"
-              >
+              <p onClick={() => navigate('/ventes?tab=history')} className="text-xs text-[#1A56DB] cursor-pointer">
                 Voir tout
               </p>
             </div>
@@ -339,7 +362,7 @@ export default function Dashboard() {
                     </span>
                   )}
                 </div>
-                <span className="text-xs font-bold text-[#1A56DB]">{formatAmount(sale.total)}</span>
+                <span className="text-xs font-bold text-[#1A56DB]">{formatFC(sale.total)}</span>
               </div>
             ))}
           </>

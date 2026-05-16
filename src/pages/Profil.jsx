@@ -52,9 +52,7 @@ export default function Profil() {
       setTeamRole(data.team_role || 'owner')
     }
 
-    // Charger les membres de l'équipe
     await fetchTeamMembers(authUser.id)
-
     setLoading(false)
   }
 
@@ -64,6 +62,7 @@ export default function Profil() {
       .select(`
         id,
         role,
+        status,
         created_at,
         member:member_id (
           id,
@@ -135,6 +134,7 @@ export default function Profil() {
         owner_id: user.id,
         member_id: targetUser.id,
         role: 'staff',
+        status: 'pending',
       })
 
     if (insertError) {
@@ -143,12 +143,7 @@ export default function Profil() {
       return
     }
 
-    await supabase
-      .from('users')
-      .update({ owner_id: user.id, team_role: 'staff' })
-      .eq('id', targetUser.id)
-
-    setInviteSuccess(`${targetUser.shop_name || targetUser.email} ajouté à ton équipe ✅`)
+    setInviteSuccess(`Invitation envoyée à ${targetUser.shop_name || targetUser.email} ✅`)
     setInviteEmail('')
     setTimeout(() => setInviteSuccess(''), 4000)
     fetchTeamMembers(user.id)
@@ -161,7 +156,6 @@ export default function Profil() {
       .delete()
       .eq('id', member.id)
 
-    // Réinitialiser le profil du membre
     await supabase
       .from('users')
       .update({
@@ -268,7 +262,6 @@ export default function Profil() {
 
       <Header title="Mon profil" />
 
-      {/* Bannière employé */}
       {teamRole === 'staff' && (
         <div className="bg-[#EBF2FF] border-b border-blue-200 px-4 py-2">
           <p className="text-xs text-[#1A56DB] font-medium">👤 Tu es employé — accès limité aux ventes</p>
@@ -547,7 +540,6 @@ export default function Profil() {
               </p>
             </div>
 
-            {/* Inviter un employé */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
               <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
                 Inviter un employé
@@ -585,11 +577,10 @@ export default function Profil() {
                 disabled={inviting}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
               >
-                {inviting ? 'Invitation...' : '+ Ajouter à mon équipe'}
+                {inviting ? 'Invitation...' : '+ Inviter un employé'}
               </button>
             </div>
 
-            {/* Liste des membres */}
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-3">
               Membres de l'équipe ({teamMembers.length})
             </p>
@@ -609,8 +600,12 @@ export default function Profil() {
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-[#0F172A]">{m.member?.shop_name || 'Employé'}</p>
                     <p className="text-xs text-[#64748B]">{m.member?.phone || 'Pas de téléphone'}</p>
-                    <span className="text-xs bg-[#EBF2FF] text-[#1A56DB] px-2 py-0.5 rounded-full font-medium">
-                      Employé
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      m.status === 'pending'
+                        ? 'bg-[#FFFBEB] text-[#B45309]'
+                        : 'bg-[#EBF2FF] text-[#1A56DB]'
+                    }`}>
+                      {m.status === 'pending' ? '⏳ En attente' : '✅ Employé actif'}
                     </span>
                   </div>
                   <button
