@@ -121,7 +121,7 @@ export default function Login() {
           .from('users')
           .select('email')
           .eq('phone', fmt)
-          .maybeSingle()
+           .limit(1)
             console.log('raw:', raw, 'clean:', clean, 'formats:', formats) // ← ici
         if (data?.email) { userData = data; break }
       }
