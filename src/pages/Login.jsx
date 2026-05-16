@@ -236,7 +236,7 @@ export default function Login() {
                   name="shop_name"
                   value={form.shop_name}
                   onChange={handleChange}
-                  placeholder="Ex: Ventes en ligne, Salon Merveille, Chez Mama Jeanne..."
+                  placeholder="Ex: Ventes en ligne, Salon Merveille..."
                   className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
                 />
               </div>
