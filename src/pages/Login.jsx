@@ -100,39 +100,30 @@ export default function Login() {
     // Si ce n'est pas un email → chercher par numéro
    if (!emailRegex.test(form.email)) {
       const raw = form.email.replace(/\s/g, '')
-      
-      // Générer plusieurs formats possibles pour chercher
-      const formats = []
-      
-      // Format brut nettoyé
       let clean = raw.replace('+243', '').replace('+', '')
-      if (clean.startsWith('0')) formats.push(clean) // 0975926833
-      if (!clean.startsWith('0')) formats.push('0' + clean) // ajouter le 0
-      formats.push('+243' + clean.replace(/^0/, '')) // +243975926833
-      formats.push(raw) // format original
+      if (!clean.startsWith('0')) clean = '0' + clean
 
-        console.log('raw:', raw, 'clean:', clean, 'formats:', formats) // ← ici
+      const response = await fetch(
+        'https://qoeextvpjhgqjrnzwkcj.supabase.co/functions/v1/phone-login',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ phone: clean }),
+        }
+      )
 
+      const result = await response.json()
 
-      // Chercher avec tous les formats
-      let userData = null
-      for (const fmt of formats) {
-        const { data } = await supabase
-          .from('users')
-          .select('email')
-          .eq('phone', fmt)
-           .limit(1)
-            console.log('raw:', raw, 'clean:', clean, 'formats:', formats) // ← ici
-        if (data?.email) { userData = data; break }
-      }
-
-      if (!userData?.email) {
+      if (!result.found || !result.email) {
         setError('Numéro non trouvé — essaie avec ton email')
         setLoading(false)
         return
       }
 
-      emailToUse = userData.email
+      emailToUse = result.email
     }
 
     const { error } = await supabase.auth.signInWithPassword({
