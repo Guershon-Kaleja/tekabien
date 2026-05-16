@@ -127,7 +127,6 @@ export default function Expired() {
     if (/^0(97|98|99)/.test(clean)) return { name: 'Airtel Money', color: '#EF4444' }
     if (/^0(80|84|85|89)/.test(clean)) return { name: 'Orange Money', color: '#F97316' }
     if (/^0(81|82|83)/.test(clean)) return { name: 'M-Pesa (Vodacom)', color: '#8B5CF6' }
-    if (/^0(90|91)/.test(clean)) return { name: 'Africell', color: '#16A34A' }
     return null
   }
 
@@ -343,7 +342,7 @@ export default function Expired() {
                       <p className="text-xs text-[#DC2626] mt-1">❌ Opérateur non reconnu</p>
                     )
                   }
-                  return <p className="text-xs text-[#64748B] mt-1">Airtel, Orange, M-Pesa ou Africell</p>
+                  return <p className="text-xs text-[#64748B] mt-1">Airtel, Orange et M-Pesa </p>
                 })()}
               </div>
 

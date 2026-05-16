@@ -363,12 +363,11 @@ export default function Profil() {
               </div>
 
               {[
-                { feature: 'Ventes par jour', free: '20 max', pro: 'Illimitées' },
+                { feature: 'Ventes par jour', free: '10 max', pro: 'Illimitées' },
                 { feature: 'Produits', free: '5 max', pro: 'Illimités' },
                 { feature: 'Clients', free: '3 max', pro: 'Illimités' },
                 { feature: 'Rapports complets', free: false, pro: true },
                 { feature: 'Export PDF', free: false, pro: true },
-                { feature: 'Mode offline', free: true, pro: true },
               ].map((f, i) => (
                 <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
@@ -395,7 +394,7 @@ export default function Profil() {
                 <p className="text-xs font-semibold text-[#0F172A] flex-1">Prix/mois</p>
                 <div className="flex gap-6">
                   <span className="text-xs font-bold text-[#64748B] w-10 text-center">0$</span>
-                  <span className="text-xs font-bold text-[#16A34A] w-10 text-center">3$</span>
+                  <span className="text-xs font-bold text-[#16A34A] w-10 text-center">5$</span>
                 </div>
               </div>
             </div>
