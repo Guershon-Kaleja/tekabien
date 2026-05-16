@@ -129,6 +129,7 @@ export default function Login() {
       }
 
       emailToUse = userData.email
+      console.log('formats testés:', formats)
     }
 
     const { error } = await supabase.auth.signInWithPassword({
