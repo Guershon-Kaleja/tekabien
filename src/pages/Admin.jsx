@@ -74,32 +74,33 @@ export default function Admin() {
     setLoading(false)
   }
 
+ const ADMIN_ACTION_URL = `https://qoeextvpjhgqjrnzwkcj.supabase.co/functions/v1/admin-action`
+
   const handleActivatePlan = async (userId, plan) => {
-    const expires = new Date()
-    expires.setDate(expires.getDate() + 30)
-
-    await supabase
-      .from('users')
-      .update({ plan, plan_expires: expires.toISOString() })
-      .eq('id', userId)
-
-    await logAction(
-      `activate_${plan}`,
-      userId,
-      `Plan ${plan} activé jusqu'au ${expires.toLocaleDateString('fr-FR')}`
-    )
-
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch(ADMIN_ACTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action: 'activate', userId, plan, months: 1 }),
+    })
     fetchAdminData()
   }
 
   const handleDisableUser = async (userId) => {
-    await supabase
-      .from('users')
-      .update({ plan: 'disabled' })
-      .eq('id', userId)
-
-    await logAction('disable_user', userId, 'Compte désactivé par l\'admin')
-
+    const { data: { session } } = await supabase.auth.getSession()
+    await fetch(ADMIN_ACTION_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action: 'disable', userId }),
+    })
     fetchAdminData()
   }
 
