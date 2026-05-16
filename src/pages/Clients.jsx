@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateClient, sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
+import { setCache, getCache, isOnline } from '../lib/offlineDB'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -15,8 +16,9 @@ export default function Clients() {
   const [filter, setFilter] = useState('tous')
   const [userId, setUserId] = useState(null)
   const [userPlan, setUserPlan] = useState('free')
+  const [online, setOnline] = useState(isOnline())
+  const [fromCache, setFromCache] = useState(false)
 
-  // Modals
   const [showForm, setShowForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [showDebtForm, setShowDebtForm] = useState(false)
@@ -37,20 +39,58 @@ export default function Clients() {
   const [debtErrors, setDebtErrors] = useState({})
   const [payErrors, setPayErrors] = useState({})
 
-  useEffect(() => { fetchClients() }, [])
+  const { formatAmount, currency } = useCurrency()
+
+  useEffect(() => {
+    fetchClients()
+
+    const handleOnline = () => {
+      setOnline(true)
+      setFromCache(false)
+      fetchClients()
+    }
+    const handleOffline = () => setOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const fetchClients = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUserId(user.id)
 
+    if (!isOnline()) {
+      const cachedClients = await getCache(`clients_${user.id}`)
+      const cachedPlan = await getCache(`plan_${user.id}`)
+      if (cachedClients) {
+        setClients(cachedClients)
+        setFromCache(true)
+      }
+      if (cachedPlan) setUserPlan(cachedPlan)
+      setLoading(false)
+      return
+    }
+
     const { data: userData } = await supabase
       .from('users').select('plan').eq('id', user.id).single()
-    if (userData) setUserPlan(userData.plan)
+    if (userData) {
+      setUserPlan(userData.plan)
+      await setCache(`plan_${user.id}`, userData.plan)
+    }
 
     const { data } = await supabase
       .from('customers').select('*').eq('user_id', user.id).order('name')
-    if (data) setClients(data)
+    if (data) {
+      setClients(data)
+      await setCache(`clients_${user.id}`, data)
+    }
+    setFromCache(false)
     setLoading(false)
   }
 
@@ -163,7 +203,6 @@ export default function Clients() {
     const newDebt = selectedClient.total_debt - amount
     const newPaid = (selectedClient.total_paid || 0) + amount
 
-    // Enregistrer le remboursement
     await supabase.from('debt_payments').insert({
       user_id: userId,
       customer_id: selectedClient.id,
@@ -171,12 +210,10 @@ export default function Clients() {
       note: sanitize(payForm.note) || 'Remboursement partiel',
     })
 
-    // Mettre à jour la dette
     await supabase.from('customers')
       .update({ total_debt: newDebt, total_paid: newPaid })
       .eq('id', selectedClient.id)
 
-    // Si dette soldée → comptabiliser les ventes crédit
     if (newDebt === 0) {
       await supabase.from('sales')
         .update({ encaissee: true })
@@ -227,8 +264,6 @@ export default function Clients() {
     window.open(`https://wa.me/${phone}?text=${msg}`, '_blank')
   }
 
-  const { formatAmount, currency } = useCurrency()
-
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
     ' à ' + new Date(dateStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -250,7 +285,7 @@ export default function Clients() {
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
 
       <div className="bg-[#1A56DB] px-4 pt-0 pb-4">
-        <Header title="Clients & Dettes" showAdd onAdd={() => setShowForm(true)} />
+        <Header title="Clients & Dettes" showAdd={online} onAdd={() => setShowForm(true)} />
         <div className="bg-white/12 rounded-xl p-3 border border-white/20 flex items-center justify-between">
           <div>
             <p className="text-blue-200 text-xs uppercase tracking-wide mb-1">Total dû</p>
@@ -263,6 +298,19 @@ export default function Clients() {
           </div>
         </div>
       </div>
+
+      {/* Bannière offline */}
+      {!online && (
+        <div className="bg-[#FFFBEB] border-b border-yellow-200 px-4 py-2 flex items-center gap-2">
+          <span className="text-sm">📶</span>
+          <div className="flex-1">
+            <p className="text-xs text-[#B45309] font-medium">Mode hors ligne</p>
+            <p className="text-xs text-[#64748B]">
+              {fromCache ? 'Données du cache — reconnecte-toi pour les dernières mises à jour' : 'Aucune donnée en cache'}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 pt-4">
 
@@ -302,7 +350,9 @@ export default function Clients() {
           <div className="text-center py-8">
             <p className="text-3xl mb-2">👥</p>
             <p className="text-sm font-semibold text-[#0F172A]">Aucun client</p>
-            <p className="text-xs text-[#64748B] mt-1">Ajoute ton premier client</p>
+            <p className="text-xs text-[#64748B] mt-1">
+              {!online && !fromCache ? 'Connecte-toi pour voir tes clients' : 'Ajoute ton premier client'}
+            </p>
           </div>
         ) : (
           filtered.map((c) => (
@@ -336,93 +386,101 @@ export default function Clients() {
                 </div>
               </div>
 
-              {/* Boutons d'action */}
-              <div className="flex gap-2 mb-2">
-                <button
-                  onClick={() => {
-                    setSelectedClient(c)
-                    setEditForm({ name: c.name, phone: c.phone || '' })
-                    setShowEditForm(true)
-                  }}
-                  className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
-                >
-                  ✏️ Modifier
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedClient(c)
-                    fetchDebtHistory(c)
-                    setShowHistory(true)
-                  }}
-                  className="flex-1 bg-[#F8FAFC] text-[#64748B] rounded-lg py-2 text-xs font-semibold border border-gray-200"
-                >
-                  📋 Historique
-                </button>
-              </div>
+              {online ? (
+                <>
+                  <div className="flex gap-2 mb-2">
+                    <button
+                      onClick={() => {
+                        setSelectedClient(c)
+                        setEditForm({ name: c.name, phone: c.phone || '' })
+                        setShowEditForm(true)
+                      }}
+                      className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                    >
+                      ✏️ Modifier
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedClient(c)
+                        fetchDebtHistory(c)
+                        setShowHistory(true)
+                      }}
+                      className="flex-1 bg-[#F8FAFC] text-[#64748B] rounded-lg py-2 text-xs font-semibold border border-gray-200"
+                    >
+                      📋 Historique
+                    </button>
+                  </div>
 
-              {c.total_debt > 0 && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => { setSelectedClient(c); setShowPayForm(true) }}
-                    className="flex-1 bg-[#FFFBEB] text-[#B45309] rounded-lg py-2 text-xs font-semibold border border-yellow-200"
-                  >
-                    💰 Paiement partiel
-                  </button>
-                  <button
-                    onClick={() => handleFullPay(c)}
-                    className="flex-1 bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold"
-                  >
-                    ✓ Tout remboursé
-                  </button>
-                </div>
-              )}
+                  {c.total_debt > 0 && (
+                    <>
+                      <div className="flex gap-2 mb-2">
+                        <button
+                          onClick={() => { setSelectedClient(c); setShowPayForm(true) }}
+                          className="flex-1 bg-[#FFFBEB] text-[#B45309] rounded-lg py-2 text-xs font-semibold border border-yellow-200"
+                        >
+                          💰 Paiement partiel
+                        </button>
+                        <button
+                          onClick={() => handleFullPay(c)}
+                          className="flex-1 bg-[#F0FDF4] text-[#16A34A] rounded-lg py-2 text-xs font-semibold"
+                        >
+                          ✓ Tout remboursé
+                        </button>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setSelectedClient(c)
+                            setEditDebtAmount(c.total_debt.toString())
+                            setShowEditDebt(true)
+                          }}
+                          className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-lg py-2 text-xs font-medium"
+                        >
+                          ✏️ Modifier dette
+                        </button>
+                        <button
+                          onClick={() => handleWhatsApp(c)}
+                          className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
+                        >
+                          💬 WhatsApp
+                        </button>
+                      </div>
+                    </>
+                  )}
 
-              {c.total_debt > 0 && (
-                <div className="flex gap-2 mt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedClient(c)
-                      setEditDebtAmount(c.total_debt.toString())
-                      setShowEditDebt(true)
-                    }}
-                    className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-lg py-2 text-xs font-medium"
-                  >
-                    ✏️ Modifier dette
-                  </button>
-                  <button
-                    onClick={() => handleWhatsApp(c)}
-                    className="flex-1 bg-[#EBF2FF] text-[#1A56DB] rounded-lg py-2 text-xs font-semibold"
-                  >
-                    💬 WhatsApp
-                  </button>
-                </div>
-              )}
-
-              {c.total_debt === 0 && (
-                <button
-                  onClick={() => { setSelectedClient(c); setShowDebtForm(true) }}
-                  className="w-full bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold mt-1"
-                >
-                  + Ajouter une dette
-                </button>
+                  {c.total_debt === 0 && (
+                    <button
+                      onClick={() => { setSelectedClient(c); setShowDebtForm(true) }}
+                      className="w-full bg-[#FEF2F2] text-[#DC2626] rounded-lg py-2 text-xs font-semibold mt-1"
+                    >
+                      + Ajouter une dette
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-[#64748B] mt-2 text-center">
+                  📶 Reconnecte-toi pour gérer les dettes
+                </p>
               )}
             </div>
           ))
         )}
 
-        <button
-          onClick={() => setShowForm(true)}
-          className={`w-full border border-dashed rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 mt-2 ${
-            canAddClient(userPlan, clients.length)
-              ? 'border-[#1A56DB] text-[#1A56DB]'
-              : 'border-gray-300 text-[#64748B]'
-          }`}
-        >
-          {canAddClient(userPlan, clients.length)
-            ? '+ Ajouter un client'
-            : `Limite atteinte (${getPlanLimits(userPlan).maxClients} max) — Passe au Pro`
-          }
-        </button>
+        {online && (
+          <button
+            onClick={() => setShowForm(true)}
+            className={`w-full border border-dashed rounded-xl py-3 text-sm font-medium flex items-center justify-center gap-2 mt-2 ${
+              canAddClient(userPlan, clients.length)
+                ? 'border-[#1A56DB] text-[#1A56DB]'
+                : 'border-gray-300 text-[#64748B]'
+            }`}
+          >
+            {canAddClient(userPlan, clients.length)
+              ? '+ Ajouter un client'
+              : `Limite atteinte (${getPlanLimits(userPlan).maxClients} max) — Passe au Pro`
+            }
+          </button>
+        )}
       </div>
 
       {/* Modal ajout client */}
@@ -608,9 +666,7 @@ export default function Clients() {
                 Confirmer le paiement
               </button>
               <button
-                onClick={() => {
-                  setPayForm({ amount: selectedClient.total_debt.toString(), note: 'Remboursement total' })
-                }}
+                onClick={() => setPayForm({ amount: selectedClient.total_debt.toString(), note: 'Remboursement total' })}
                 className="px-3 bg-[#F0FDF4] text-[#16A34A] rounded-xl py-3 text-xs font-semibold border border-green-200"
               >
                 Tout
