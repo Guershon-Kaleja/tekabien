@@ -18,6 +18,7 @@ import Profil from './pages/Profil'
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
 
   useAutoLogout()
 
@@ -34,6 +35,17 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
@@ -48,11 +60,38 @@ function App() {
     )
   }
 
+  if (!isOnline) {
+    return (
+      <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 p-8 text-center shadow-sm">
+          <div className="w-20 h-20 bg-[#FFFBEB] rounded-full flex items-center justify-center mx-auto mb-5">
+            <span className="text-4xl">📶</span>
+          </div>
+          <h2 className="text-lg font-bold text-[#0F172A] mb-2">Pas de connexion</h2>
+          <p className="text-sm text-[#64748B] leading-relaxed mb-2">
+            TekaBien nécessite une connexion internet pour fonctionner.
+          </p>
+          <p className="text-xs text-[#64748B] mb-6">
+            Vérifie ton réseau Airtel, Orange, M-Pesa ou Africell et réessaie.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
+          >
+            🔄 Réessayer
+          </button>
+          <p className="text-xs text-[#64748B]">
+            Tes données sont sauvegardées — rien n'est perdu.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-        {/* Onboarding accessible sans session — délai de détection session après inscription */}
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
         <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
