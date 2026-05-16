@@ -7,7 +7,6 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')
 const CALLBACK_URL = `${SUPABASE_URL}/functions/v1/payment-callback?secret=${WEBHOOK_SECRET}`
 
-// Montants fixes côté serveur — ne peuvent pas être modifiés par le frontend
 const PLAN_PRICES = {
   pro: { USD: 0.1, CDF: 280 },
   business: { USD: 0.2, CDF: 560 },
@@ -28,12 +27,8 @@ serve(async (req) => {
     const body = await req.json()
     const { action, phone, plan, currency } = body
 
-    console.log('=== TekaBien Payment Function ===')
-    console.log('Action:', action)
-
     if (action === 'pay') {
 
-      // Extraire userId depuis le JWT — pas depuis le body
       const authHeader = req.headers.get('Authorization')
       if (!authHeader) {
         return new Response(JSON.stringify({
@@ -64,9 +59,7 @@ serve(async (req) => {
       }
 
       const userId = user.id
-      console.log('UserId depuis JWT:', userId)
 
-      // Vérifier que le plan est valide
       if (!plan || !PLAN_PRICES[plan]) {
         return new Response(JSON.stringify({
           success: false,
@@ -77,7 +70,6 @@ serve(async (req) => {
         })
       }
 
-      // Vérifier que la devise est valide
       if (!currency || !['USD', 'CDF'].includes(currency)) {
         return new Response(JSON.stringify({
           success: false,
@@ -88,16 +80,13 @@ serve(async (req) => {
         })
       }
 
-      // Calculer le montant côté serveur — ignore le montant du frontend
       const serverAmount = PLAN_PRICES[plan][currency]
-      console.log('Montant serveur:', serverAmount, currency, 'pour plan:', plan)
 
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       )
 
-      // Vérifier que l'utilisateur existe
       const { data: userData } = await supabase
         .from('users')
         .select('plan, plan_expires')
@@ -121,9 +110,8 @@ serve(async (req) => {
         .eq('user_id', userId)
         .gte('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
 
-      console.log('Recent payments:', recentPayments?.length)
-
       if (recentPayments && recentPayments.length >= 3) {
+        console.log('Rate limit atteint pour user:', userId)
         return new Response(JSON.stringify({
           success: false,
           message: 'Trop de tentatives — attends 10 minutes avant de réessayer'
@@ -142,7 +130,7 @@ serve(async (req) => {
         callback: CALLBACK_URL,
       }
 
-      console.log('Payload vers Labyrinthe:', JSON.stringify(payloadToLabyrinthe))
+      console.log('=== Paiement initié — plan:', plan, 'currency:', currency, 'amount:', serverAmount, '===')
 
       const response = await fetch(`${LABYRINTHE_BASE_URL}/payment/mobile`, {
         method: 'POST',
@@ -152,10 +140,9 @@ serve(async (req) => {
 
       const data = await response.json()
 
-      console.log('Réponse Labyrinthe RAW:', JSON.stringify(data))
+      console.log('Réponse Labyrinthe — success:', data?.success, 'orderNumber:', data?.orderNumber)
 
       if (data?.success) {
-        // Stocker le paiement avec le montant serveur — pas celui du frontend
         await supabase.from('payments').insert({
           user_id: userId,
           reference: data.orderNumber,

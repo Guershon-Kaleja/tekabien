@@ -8,37 +8,28 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  console.log('=== CALLBACK RECU ===')
-  console.log('Method:', req.method)
-  console.log('URL:', req.url)
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Vérifier le secret webhook
     const url = new URL(req.url)
     const secret = url.searchParams.get('secret')
     const expectedSecret = Deno.env.get('WEBHOOK_SECRET')
 
     if (!secret || secret !== expectedSecret) {
-      console.log('❌ Secret invalide:', secret)
+      console.log('❌ Secret invalide')
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
       })
     }
 
-    console.log('✅ Secret valide')
-
     const rawBody = await req.text()
-    console.log('Raw body:', rawBody)
 
     let body = {}
     try {
       body = JSON.parse(rawBody)
-      console.log('Parsed body:', JSON.stringify(body))
     } catch (e) {
       console.log('Parse error:', String(e))
     }
@@ -47,9 +38,7 @@ serve(async (req) => {
     const orderNumber = body?.orderNumber
     const reference = body?.reference
 
-    console.log('Status code:', statusCode)
-    console.log('OrderNumber:', orderNumber)
-    console.log('Reference:', reference)
+    console.log('=== Callback reçu — orderNumber:', orderNumber, 'statusCode:', statusCode, '===')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -65,7 +54,6 @@ serve(async (req) => {
       })
     }
 
-    // Recherche sécurisée — pas d'injection SQL possible
     let payment = null
 
     const { data: byRef } = await supabase
@@ -85,11 +73,10 @@ serve(async (req) => {
       if (byOrder) payment = byOrder
     }
 
-    console.log('Payment trouvé:', JSON.stringify(payment))
+    console.log('Payment trouvé:', payment?.id, 'status:', payment?.status)
 
     if (payment && payment.status === 'pending' && statusCode === 2) {
 
-      // Marquer comme completed IMMÉDIATEMENT pour éviter double activation
       await supabase
         .from('payments')
         .update({ status: 'completed', order_number: orderNumber })
@@ -116,7 +103,7 @@ serve(async (req) => {
         })
         .eq('id', payment.user_id)
 
-      console.log('✅ Plan activé pour user:', payment.user_id, 'plan:', payment.plan, 'expires:', expires.toISOString())
+      console.log('✅ Plan activé — plan:', payment.plan, 'expires:', expires.toISOString())
 
     } else if (payment && payment.status === 'pending' && statusCode === 3) {
       await supabase
@@ -126,7 +113,7 @@ serve(async (req) => {
 
       console.log('❌ Paiement échoué')
     } else {
-      console.log('Ignoré — payment status:', payment?.status, 'statusCode:', statusCode)
+      console.log('Ignoré — status:', payment?.status, 'statusCode:', statusCode)
     }
 
     return new Response(JSON.stringify({ received: true }), {
