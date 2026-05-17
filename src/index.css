@@ -3,19 +3,44 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+html {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
 }
 
 body {
-  background-color: #EEF2F7;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: fixed;
   overscroll-behavior: none;
+  background-color: #EEF2F7;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
 
 /* Fix zoom iOS sur les inputs */
 input, textarea, select {
   font-size: 16px !important;
+  user-select: text;
 }
 
-/* Safe area pour iPhone notch et barre en bas */
-.safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 16px);
+/* Scroll natif fluide */
+.scroll-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
