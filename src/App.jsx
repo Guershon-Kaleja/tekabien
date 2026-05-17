@@ -11,7 +11,6 @@ const Ventes = lazy(() => import('./pages/Ventes'))
 const Stocks = lazy(() => import('./pages/Stocks'))
 const Clients = lazy(() => import('./pages/Clients'))
 const Depenses = lazy(() => import('./pages/Depenses'))
-const Admin = lazy(() => import('./pages/Admin'))
 const Rapports = lazy(() => import('./pages/Rapports'))
 const Expired = lazy(() => import('./pages/Expired'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
@@ -138,7 +137,6 @@ function App() {
             <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
             <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
             <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
-            <Route path="/tb-admin-2025" element={<Admin />} />
             <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
             <Route path="/expired" element={<Expired />} />
             <Route path="/reset-password" element={<ResetPassword />} />
