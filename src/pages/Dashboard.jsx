@@ -173,9 +173,7 @@ export default function Dashboard() {
       <div className="bg-[#1A56DB] px-4 pt-4 pb-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.2)' }}>
-              <span className="text-lg">🏪</span>
-            </div>
+            <img src="/icon-192.png" alt="TekaBien" className="w-8 h-8 rounded-lg" />
             <div>
               <p className="text-white font-semibold text-sm">{shopName}</p>
               <p className="text-xs capitalize" style={{ color: 'rgba(255,255,255,0.7)' }}>{dateStr}</p>

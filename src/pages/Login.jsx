@@ -189,9 +189,11 @@ export default function Login() {
 
         {tab === 'welcome' && (
           <div className="p-6 text-center">
-            <div className="w-16 h-16 bg-[#0F172A] rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-3xl">🏪</span>
-            </div>
+           <img 
+              src="/icon-192.png" 
+              alt="TekaBien" 
+              className="w-16 h-16 rounded-2xl mx-auto mb-4"
+            />
             <h1 className="text-2xl font-bold text-[#0F172A] mb-2">TekaBien</h1>
             <p className="text-[#64748B] text-sm mb-6 leading-relaxed">
               Fini le cahier, place au digital. Gère ton activité depuis ton téléphone.

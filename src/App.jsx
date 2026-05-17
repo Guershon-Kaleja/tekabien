@@ -71,9 +71,7 @@ function App() {
     return (
       <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-[#0F172A] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-white text-2xl">🏪</span>
-          </div>
+          <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
           <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
           <p className="text-[#64748B] text-sm mt-1">Chargement...</p>
         </div>
