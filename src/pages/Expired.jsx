@@ -18,7 +18,7 @@ export default function Expired() {
   const [currentReference, setCurrentReference] = useState(null)
 
   const basePrices = {
-    pro: { USD: 0.1, CDF: 280 },
+    pro: { USD: 5, CDF: 12000 },
   }
 
   const discounts = { 1: 0, 3: 10, 6: 15, 12: 20 }
