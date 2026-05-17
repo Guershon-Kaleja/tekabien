@@ -515,7 +515,7 @@ export default function Rapports() {
                 </p>
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                   <ResponsiveContainer width="100%" height={200}>
-                   <PieChart>
+                  <PieChart>
                       <Pie
                         data={stats.paymentMethods}
                         dataKey="total"
@@ -523,15 +523,19 @@ export default function Rapports() {
                         cx="50%"
                         cy="50%"
                         outerRadius={80}
+                        label={false}
                         labelLine={false}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                       >
                         {stats.paymentMethods.map((entry, index) => (
                           <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
                       <Tooltip formatter={(value) => formatAmount(value)} />
-                      <Legend formatter={(value) => paymentLabel(value)} iconType="circle" iconSize={8} />
+                      <Legend
+                        formatter={(value, entry) => `${paymentLabel(value)} ${(entry.payload.percent * 100).toFixed(0)}%`}
+                        iconType="circle"
+                        iconSize={8}
+                      />
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
