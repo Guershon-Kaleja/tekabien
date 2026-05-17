@@ -116,8 +116,7 @@ function App() {
 
   return (
     <BrowserRouter>
-       <div className="max-w-md mx-auto relative bg-[#EEF2F7]" 
-         style={{ height: '100dvh', overflow: 'hidden' }}>
+      <div className="max-w-md mx-auto bg-[#EEF2F7]">
         <Suspense fallback={
           <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
             <div className="text-center">

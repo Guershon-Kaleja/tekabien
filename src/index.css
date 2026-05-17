@@ -3,27 +3,13 @@
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-}
-
-html {
-  height: 100%;
-  width: 100%;
 }
 
 body {
-  height: 100%;
-  width: 100%;
   overscroll-behavior: none;
   background-color: #EEF2F7;
 }
 
-#root {
-  height: 100%;
-  width: 100%;
-}
-
 input, textarea, select {
   font-size: 16px !important;
-  user-select: text;
 }
