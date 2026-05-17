@@ -159,9 +159,7 @@ export default function Profil() {
         {activeTab === 'profil' && (
           <>
             <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4 text-center">
-              <div className="w-16 h-16 bg-[#1A56DB] rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <span className="text-3xl">🏪</span>
-              </div>
+              <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-3" />
               <p className="text-base font-bold text-[#0F172A]">{form.shop_name}</p>
               <p className="text-xs text-[#64748B] mt-1">{user?.email}</p>
               <span
