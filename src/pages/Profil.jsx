@@ -369,7 +369,7 @@ export default function Profil() {
                 { feature: 'Rapports complets', free: false, pro: true },
                 { feature: 'Export PDF', free: false, pro: true },
               ].map((f, i) => (
-                <div key={i} className="flex items-center py-2 border-b border-gray-100 last:border-0">
+                <div key={i} className={`flex items-center py-2 ${i < 4 ? 'border-b border-gray-100' : ''}`}>
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
                   <div className="flex gap-3">
                     <span className={`text-xs w-16 text-center font-medium ${
