@@ -405,7 +405,7 @@ export default function Profil() {
                 onClick={() => navigate('/expired')}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
               >
-                Passer au Pro — 3$/mois
+                Passer au Pro — 5$/mois
               </button>
             )}
 
