@@ -19,7 +19,6 @@ export default function Admin() {
     revenueCDF: 0,
     conversionRate: 0,
   })
-  const [setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
   const [adminEmail, setAdminEmail] = useState('')
@@ -64,10 +63,9 @@ export default function Admin() {
 
       if (data.users) {
         const users = data.users
-        const payments = data.payments || []
+        const paymentsData = data.payments || []
         setUsers(users)
         setFilteredUsers(users)
-        setPayments(payments)
 
         const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
         const newThisWeek = users.filter(u => new Date(u.created_at) > oneWeekAgo).length
@@ -76,18 +74,11 @@ export default function Admin() {
         const frees = users.filter(u => u.plan === 'free').length
         const conversionRate = trials + pros > 0 ? Math.round((pros / (trials + pros)) * 100) : 0
 
-        // Revenus réels depuis payments
-        const thisMonth = new Date()
-        thisMonth.setDate(1)
-        thisMonth.setHours(0, 0, 0, 0)
-        const monthPayments = payments.filter(p =>
-          p.status === 'completed' && new Date(p.created_at) >= thisMonth
-        )
-        const revenueUSD = monthPayments
-          .filter(p => p.currency === 'USD')
+        const revenueUSD = paymentsData
+          .filter(p => p.status === 'completed' && p.currency === 'USD')
           .reduce((sum, p) => sum + p.amount, 0)
-        const revenueCDF = monthPayments
-          .filter(p => p.currency === 'CDF')
+        const revenueCDF = paymentsData
+          .filter(p => p.status === 'completed' && p.currency === 'CDF')
           .reduce((sum, p) => sum + p.amount, 0)
 
         setStats({
