@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend  } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
@@ -514,16 +514,16 @@ export default function Rapports() {
                   Répartition des paiements
                 </p>
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                    
-                      <PieChart width={300} height={300}>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
                           <Pie
                             data={stats.paymentMethods}
                             dataKey="total"
                             nameKey="method"
                             cx="50%"
                             cy="50%"
-                            outerRadius={100}
-                            label={false}
+                            outerRadius={70}
+                            label={({ method, percent }) => `${paymentLabel(method)} ${(percent * 100).toFixed(0)}%`}
                             labelLine={false}
                           >
                             {stats.paymentMethods.map((entry, index) => (
@@ -531,9 +531,8 @@ export default function Rapports() {
                             ))}
                           </Pie>
                           <Tooltip formatter={(value) => formatAmount(value)} />
-                          <Legend formatter={(value) => paymentLabel(value)} iconType="circle" iconSize={8} />
                         </PieChart>
-                      
+                      </ResponsiveContainer>
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
                     {stats.paymentMethods.map((pm) => (
                       <div key={pm.method} className="flex items-center gap-1">
