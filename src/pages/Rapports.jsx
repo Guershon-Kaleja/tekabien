@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -7,11 +7,11 @@ import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import jsPDF from 'jspdf'
+import Legend from 'recharts'
 
 export default function Rapports() {
   const navigate = useNavigate()
   usePlanCheck()
-  const reportRef = useRef(null)
   const [period, setPeriod] = useState('today')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -515,23 +515,28 @@ export default function Rapports() {
                 </p>
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                   <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={stats.paymentMethods}
-                        dataKey="total"
-                        nameKey="method"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={70}
-                        label={({ method, percent }) => `${paymentLabel(method)} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
-                      >
-                        {stats.paymentMethods.map((entry, index) => (
-                          <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => formatAmount(value)} />
-                    </PieChart>
+                   <PieChart>
+                    <Pie
+                      data={stats.paymentMethods}
+                      dataKey="total"
+                      nameKey="method"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      labelLine={false}
+                      label={false}
+                    >
+                      {stats.paymentMethods.map((entry, index) => (
+                        <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => formatAmount(value)} />
+                    <Legend
+                      formatter={(value) => paymentLabel(value)}
+                      iconType="circle"
+                      iconSize={8}
+                    />
+                  </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
                     {stats.paymentMethods.map((pm) => (
