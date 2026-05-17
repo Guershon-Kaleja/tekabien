@@ -516,27 +516,23 @@ export default function Rapports() {
                 <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
                   <ResponsiveContainer width="100%" height={200}>
                    <PieChart>
-                    <Pie
-                      data={stats.paymentMethods}
-                      dataKey="total"
-                      nameKey="method"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      labelLine={false}
-                      label={false}
-                    >
-                      {stats.paymentMethods.map((entry, index) => (
-                        <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => formatAmount(value)} />
-                    <Legend
-                      formatter={(value) => paymentLabel(value)}
-                      iconType="circle"
-                      iconSize={8}
-                    />
-                  </PieChart>
+                      <Pie
+                        data={stats.paymentMethods}
+                        dataKey="total"
+                        nameKey="method"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        labelLine={false}
+                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                      >
+                        {stats.paymentMethods.map((entry, index) => (
+                          <Cell key={entry.method} fill={paymentColor(entry.method) || COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatAmount(value)} />
+                      <Legend formatter={(value) => paymentLabel(value)} iconType="circle" iconSize={8} />
+                    </PieChart>
                   </ResponsiveContainer>
                   <div className="flex flex-wrap gap-2 justify-center mt-2">
                     {stats.paymentMethods.map((pm) => (
