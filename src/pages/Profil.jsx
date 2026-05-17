@@ -19,6 +19,7 @@ export default function Profil() {
   const [activeTab, setActiveTab] = useState('profil')
   const [userPlan, setUserPlan] = useState(null)
   const [planExpires, setPlanExpires] = useState(null)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   useEffect(() => { fetchProfile() }, [])
 
@@ -51,8 +52,16 @@ export default function Profil() {
       setError('Le nom de ta boutique doit avoir au moins 2 caractères')
       return
     }
-    setError('')
-    setSaving(true)
+     if (form.phone) {
+        const cleanPhone = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+        if (!/^\d+$/.test(cleanPhone) || cleanPhone.length !== 10 || !/^0[7-9]/.test(cleanPhone)) {
+          setError('Numéro invalide — doit commencer par 07x, 08x ou 09x et avoir 10 chiffres')
+          return
+        }
+      }
+
+      setError('')
+      setSaving(true)
 
     const { error } = await supabase
       .from('users')
@@ -260,12 +269,41 @@ export default function Profil() {
               </button>
             </div>
 
-            <button
-              onClick={handleLogout}
+           <button
+              onClick={() => setShowLogoutConfirm(true)}
               className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm"
             >
               Se déconnecter
             </button>
+
+            {/* Modal confirmation déconnexion */}
+            {showLogoutConfirm && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+                  <div className="text-center mb-4">
+                    <p className="text-3xl mb-3">👋</p>
+                    <h2 className="text-base font-bold text-[#0F172A]">Se déconnecter ?</h2>
+                    <p className="text-sm text-[#64748B] mt-1">
+                      Tu devras te reconnecter pour accéder à ton compte.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowLogoutConfirm(false)}
+                      className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm"
+                    >
+                      Se déconnecter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
 
