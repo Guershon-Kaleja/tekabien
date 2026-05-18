@@ -42,7 +42,7 @@ export default function Dashboard() {
       .eq('id', user.id)
       .single()
 
-    if (userData) {
+   if (userData) {
       setShopName(userData.shop_name)
       setUserPlan(userData.plan)
       setPlanExpires(userData.plan_expires)
@@ -52,6 +52,15 @@ export default function Dashboard() {
         const now = new Date()
         const diff = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
         setTrialDaysLeft(diff > 0 ? diff : 0)
+      }
+
+      if (userData.plan === 'pro' && userData.plan_expires) {
+        const expires = new Date(userData.plan_expires)
+        const now = new Date()
+        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
+        if (daysLeft <= 3 && daysLeft > 0) {
+          setTrialDaysLeft(daysLeft) // réutilise le même state
+        }
       }
     }
 
@@ -118,7 +127,18 @@ export default function Dashboard() {
     orange: 'Orange Money', mpesa: 'M-Pesa', credit: 'Crédit'
   })[method] || method
 
+  const getPlanLabel = () => {
+    if (userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3) 
+      return `⚠️ Abonnement expire dans ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} !`
+    if (userPlan === 'pro') return 'Plan Pro actif'
+    if (userPlan === 'trial' && trialDaysLeft === 0) return "Ton essai expire aujourd'hui !"
+    if (userPlan === 'trial' && trialDaysLeft > 0) return `Il te reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai`
+    if (userPlan === 'free') return 'Plan gratuit — fonctionnalités limitées'
+    return ''
+  }
+
   const getPlanBannerBg = () => {
+    if (userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3) return 'bg-[#FEF2F2]'
     if (userPlan === 'trial' && trialDaysLeft <= 5) return 'bg-[#FEF2F2]'
     if (userPlan === 'trial') return 'bg-[#FFFBEB]'
     if (userPlan === 'pro') return 'bg-[#F0FDF4]'
@@ -127,6 +147,7 @@ export default function Dashboard() {
   }
 
   const getPlanTextColor = () => {
+    if (userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3) return 'text-[#DC2626]'
     if (userPlan === 'pro') return 'text-[#16A34A]'
     if (userPlan === 'trial' && trialDaysLeft <= 5) return 'text-[#DC2626]'
     if (userPlan === 'trial') return 'text-[#B45309]'
@@ -140,14 +161,6 @@ export default function Dashboard() {
     if (userPlan === 'trial') return '🎁'
     if (userPlan === 'free') return '🔒'
     return '🔒'
-  }
-
-  const getPlanLabel = () => {
-    if (userPlan === 'pro') return 'Plan Pro actif'
-    if (userPlan === 'trial' && trialDaysLeft === 0) return "Ton essai expire aujourd'hui !"
-    if (userPlan === 'trial' && trialDaysLeft > 0) return `Il te reste ${trialDaysLeft} jour${trialDaysLeft > 1 ? 's' : ''} d'essai`
-    if (userPlan === 'free') return 'Plan gratuit — fonctionnalités limitées'
-    return ''
   }
 
   const getPlanSub = () => {
@@ -243,6 +256,15 @@ export default function Dashboard() {
             <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#16A34A] text-white">
               PRO
             </span>
+          )}
+
+          {userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3 && (
+            <button
+              onClick={() => navigate('/expired')}
+              className="text-xs font-semibold px-3 py-1.5 rounded-lg whitespace-nowrap bg-[#DC2626] text-white"
+            >
+              Renouveler
+            </button>
           )}
         </div>
       )}
