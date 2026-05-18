@@ -399,7 +399,7 @@ export default function Profil() {
               </div>
 
               {[
-                { feature: 'Ventes par jour', free: '10/jour', pro: 'Illimitées' },
+                { feature: 'Ventes par jour', free: '5/jour', pro: 'Illimitées' },
                 { feature: 'Produits', free: '5 max', pro: 'Illimités' },
                 { feature: 'Clients', free: '3 max', pro: 'Illimités' },
                 { feature: 'Rapports complets', free: false, pro: true },

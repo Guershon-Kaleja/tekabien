@@ -170,7 +170,7 @@ export default function Dashboard() {
     if (userPlan === 'pro' && planExpires)
       return `Renouvellement le ${new Date(planExpires).toLocaleDateString('fr-FR')}`
     if (userPlan === 'trial') return 'Passe au Pro pour continuer sans interruption'
-    if (userPlan === 'free') return '10 ventes/j · 5 produits · 3 clients max'
+    if (userPlan === 'free') return '5 ventes/j · 5 produits · 3 clients max'
     return ''
   }
 
