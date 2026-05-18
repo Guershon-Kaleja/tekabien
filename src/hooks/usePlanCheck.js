@@ -26,11 +26,15 @@ export default function usePlanCheck() {
       return
     }
 
-    if ((data.plan === 'trial' || data.plan === 'pro' || data.plan === 'business') && data.plan_expires) {
+    if ((data.plan === 'trial' || data.plan === 'pro') && data.plan_expires) {
       const expires = new Date(data.plan_expires)
       const gracePeriod = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
       if (new Date() > gracePeriod) {
-        navigate('/expired')
+        // Passer automatiquement en free — accès dashboard avec limites
+        await supabase
+          .from('users')
+          .update({ plan: 'free' })
+          .eq('id', user.id)
         return
       }
     }
