@@ -186,7 +186,9 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
+      <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen"
+        style={{ overscrollBehavior: 'none' }}
+        >
         <InstallBanner />
         <Suspense fallback={
           <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
