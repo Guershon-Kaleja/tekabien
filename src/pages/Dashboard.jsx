@@ -155,7 +155,8 @@ export default function Dashboard() {
     return 'text-[#64748B]'
   }
 
-  const getPlanIcon = () => {
+ const getPlanIcon = () => {
+    if (userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3) return '⚠️'
     if (userPlan === 'pro') return '✅'
     if (userPlan === 'trial' && trialDaysLeft <= 5) return '⚠️'
     if (userPlan === 'trial') return '🎁'
@@ -164,9 +165,10 @@ export default function Dashboard() {
   }
 
   const getPlanSub = () => {
-    if (userPlan === 'pro' && planExpires) {
+    if (userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3 && planExpires)
+      return `Expire le ${new Date(planExpires).toLocaleDateString('fr-FR')} — Renouvelez maintenant`
+    if (userPlan === 'pro' && planExpires)
       return `Renouvellement le ${new Date(planExpires).toLocaleDateString('fr-FR')}`
-    }
     if (userPlan === 'trial') return 'Passe au Pro pour continuer sans interruption'
     if (userPlan === 'free') return '10 ventes/j · 5 produits · 3 clients max'
     return ''
