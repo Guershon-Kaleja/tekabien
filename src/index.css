@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 * {
-  box-sizing: border-box;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 html {
