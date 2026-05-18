@@ -31,18 +31,19 @@ export default function InstallBanner() {
               TekaBien n'est pas encore sur l'App Store mais vous pouvez l'installer facilement :
             </p>
             <div className="space-y-2">
-              {[
-                { step: '1', text: 'Appuyez sur le bouton Partager', icon: '⬆️' },
-                { step: '2', text: 'Faites défiler et appuyez sur "Sur l\'écran d\'accueil"', icon: '➕' },
-                { step: '3', text: 'Appuyez sur "Ajouter" en haut à droite', icon: '✅' },
-              ].map((s) => (
+             {[
+                { step: '1', text: 'Appuyez sur les 3 points ··· en en bas à droite', icon: '⋯' },
+                { step: '2', text: 'Appuyez sur "Partager"', icon: '⬆️' },
+                { step: '3', text: 'Appuyez encore sur les 3 points ···', icon: '⋯' },
+                { step: '4', text: 'Appuyez sur "+" ou "Écran d\'accueil"', icon: '➕' },
+                ].map((s) => (
                 <div key={s.step} className="flex items-center gap-2">
-                  <span className="w-5 h-5 bg-[#1A56DB] text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
+                    <span className="w-5 h-5 bg-[#1A56DB] text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {s.step}
-                  </span>
-                  <span className="text-xs text-[#64748B]">{s.icon} {s.text}</span>
+                    </span>
+                    <span className="text-xs text-[#64748B]">{s.icon} {s.text}</span>
                 </div>
-              ))}
+                ))}
             </div>
           </div>
           <button
