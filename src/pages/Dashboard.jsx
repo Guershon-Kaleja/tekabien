@@ -252,12 +252,6 @@ export default function Dashboard() {
             </button>
           )}
 
-          {userPlan === 'pro' && (
-            <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#16A34A] text-white">
-              PRO
-            </span>
-          )}
-
           {userPlan === 'pro' && trialDaysLeft > 0 && trialDaysLeft <= 3 && (
             <button
               onClick={() => navigate('/expired')}
@@ -265,6 +259,12 @@ export default function Dashboard() {
             >
               Renouveler
             </button>
+          )}
+
+          {userPlan === 'pro' && (!trialDaysLeft || trialDaysLeft > 3) && (
+            <span className="text-xs font-bold px-3 py-1.5 rounded-lg bg-[#16A34A] text-white">
+              PRO
+            </span>
           )}
         </div>
       )}
