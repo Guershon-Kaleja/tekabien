@@ -284,6 +284,7 @@ export default function Clients() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
             onBlur={() => window.scrollTo(0, 0)}
             placeholder="Chercher un client..."
             className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
