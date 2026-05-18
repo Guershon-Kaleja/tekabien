@@ -173,7 +173,7 @@ export default function Stocks() {
   ]
 
   return (
-    <div className="min-h-screen bg-[#EEF2F7] pb-24">
+    <div className="bg-[#EEF2F7]">
 
       <div className="bg-[#1A56DB] px-4 pt-0 pb-4">
         <Header title="Mes stocks" showAdd onAdd={() => setShowForm(true)} />

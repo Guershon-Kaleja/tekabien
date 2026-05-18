@@ -13,47 +13,32 @@ export default function Navbar() {
   const current = window.location.pathname
 
   return (
-    <>
-      {/* Espace réservé pour que le contenu ne soit pas caché */}
-      <div style={{ height: '65px' }} />
-      
-      {/* Navbar fixe */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          width: '100%',
-          maxWidth: '448px',
-          backgroundColor: 'white',
-          borderTop: '1px solid #f1f5f9',
-          zIndex: 9999,
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        }}
-      >
-        <div className="flex justify-around py-2 px-2">
-          {items.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="flex flex-col items-center gap-1 flex-1"
-            >
-              <span className={`text-xl ${current === item.path ? 'scale-110' : ''}`}>
-                {item.icon}
-              </span>
-              <span className={`text-xs font-medium ${
-                current === item.path ? 'text-[#1A56DB]' : 'text-[#64748B]'
-              }`}>
-                {item.label}
-              </span>
-              {current === item.path && (
-                <div className="w-1 h-1 rounded-full bg-[#1A56DB]" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>
+    <div
+      className="bg-white border-t border-gray-100 flex justify-around py-2 px-2"
+      style={{ 
+        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
+        flexShrink: 0,
+      }}
+    >
+      {items.map((item) => (
+        <button
+          key={item.path}
+          onClick={() => navigate(item.path)}
+          className="flex flex-col items-center gap-1 flex-1"
+        >
+          <span className={`text-xl ${current === item.path ? 'scale-110' : ''}`}>
+            {item.icon}
+          </span>
+          <span className={`text-xs font-medium ${
+            current === item.path ? 'text-[#1A56DB]' : 'text-[#64748B]'
+          }`}>
+            {item.label}
+          </span>
+          {current === item.path && (
+            <div className="w-1 h-1 rounded-full bg-[#1A56DB]" />
+          )}
+        </button>
+      ))}
+    </div>
   )
 }

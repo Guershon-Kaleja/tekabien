@@ -9,7 +9,7 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [validSession, setValidSession] = useState(false)
+  const [setValidSession] = useState(false)
 
   useEffect(() => {
     supabase.auth.onAuthStateChange(async (event, session) => {

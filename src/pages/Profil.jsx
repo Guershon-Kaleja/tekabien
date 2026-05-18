@@ -139,7 +139,7 @@ export default function Profil() {
   }
 
   return (
-    <div className="min-h-screen bg-[#EEF2F7] pb-24">
+    <div className="bg-[#EEF2F7]">
 
       <Header title="Mon profil" />
 

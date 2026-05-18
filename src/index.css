@@ -5,15 +5,14 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html {
+html, body {
+  height: 100%;
+  overscroll-behavior: none;
   background-color: #1A56DB;
-  height: -webkit-fill-available;
 }
 
 body {
-  overscroll-behavior: none;
   background-color: #EEF2F7;
-  min-height: -webkit-fill-available;
 }
 
 input, textarea, select {
