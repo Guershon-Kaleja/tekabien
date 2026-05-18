@@ -41,6 +41,16 @@ export default function Clients() {
 
   useEffect(() => { fetchClients() }, [])
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (document.activeElement.tagName !== 'INPUT') {
+        window.scrollTo(0, 0)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const fetchClients = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -274,6 +284,7 @@ export default function Clients() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onBlur={() => window.scrollTo(0, 0)}
             placeholder="Chercher un client..."
             className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
           />
