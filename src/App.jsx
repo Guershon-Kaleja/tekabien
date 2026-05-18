@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import useAutoLogout from './hooks/useAutoLogout'
+import InstallBanner from './components/InstallBanner'
 
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
@@ -186,6 +187,7 @@ function App() {
   return (
     <BrowserRouter>
       <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
+        <InstallBanner />
         <Suspense fallback={
           <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
             <div className="text-center">
