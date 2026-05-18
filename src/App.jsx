@@ -184,37 +184,32 @@ function App() {
     )
   }
 
- return (
+  return (
     <BrowserRouter>
-      <div 
-        className="max-w-md mx-auto bg-[#EEF2F7] flex flex-col"
-        style={{ height: '100dvh', overflow: 'hidden' }}
-      >
-        <div className="flex-1 overflow-y-auto">
-          <InstallBanner />
-          <Suspense fallback={
-            <div className="bg-[#EEF2F7] flex items-center justify-center" style={{ height: '100dvh' }}>
-              <div className="text-center">
-                <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
-                <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
-              </div>
+      <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
+        <InstallBanner />
+        <Suspense fallback={
+          <div className="bg-[#EEF2F7] flex items-center justify-center" style={{ height: '100dvh' }}>
+            <div className="text-center">
+              <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
+              <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
             </div>
-          }>
-            <Routes>
-              <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
-              <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
-              <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
-              <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
-              <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
-              <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
-              <Route path="/expired" element={<Expired />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
-            </Routes>
-          </Suspense>
-        </div>
+          </div>
+        }>
+          <Routes>
+            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
+            <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
+            <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
+            <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
+            <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
+            <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
+            <Route path="/expired" element={<Expired />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
+          </Routes>
+        </Suspense>
       </div>
     </BrowserRouter>
   )

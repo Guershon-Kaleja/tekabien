@@ -14,11 +14,8 @@ export default function Navbar() {
 
   return (
     <div
-      className="bg-white border-t border-gray-100 flex justify-around py-2 px-2"
-      style={{ 
-        paddingBottom: 'env(safe-area-inset-bottom, 8px)',
-        flexShrink: 0,
-      }}
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around py-2 px-2 z-40"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
     >
       {items.map((item) => (
         <button
