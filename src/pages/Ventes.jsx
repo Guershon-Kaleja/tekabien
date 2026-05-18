@@ -244,7 +244,7 @@ export default function Ventes() {
     name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?'
 
   return (
-    <div className="min-h-screen bg-[#EEF2F7] pb-8">
+    <div className="min-h-screen bg-[#EEF2F7] pb-32">
 
       <Header title="Ventes" />
 
