@@ -2,7 +2,8 @@ import { serve } from 'https://deno.land/std@0.208.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': 'https://tekabien.vercel.app',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -13,7 +14,16 @@ serve(async (req) => {
 
   try {
     const { phone } = await req.json()
+
     if (!phone) {
+      return new Response(JSON.stringify({ found: false }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    const cleanPhone = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+    if (!/^\d{10}$/.test(cleanPhone) || !/^0[7-9]/.test(cleanPhone)) {
       return new Response(JSON.stringify({ found: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -28,10 +38,11 @@ serve(async (req) => {
     const { data } = await supabase
       .from('users')
       .select('email')
-      .eq('phone', phone)
+      .eq('phone', cleanPhone)
       .limit(1)
+      .maybeSingle()
 
-    const email = data?.[0]?.email
+    const email = data?.email
 
     if (!email) {
       return new Response(JSON.stringify({ found: false }), {
@@ -45,8 +56,8 @@ serve(async (req) => {
       status: 200,
     })
 
-  } catch (error) {
-    return new Response(JSON.stringify({ found: false, error: String(error) }), {
+  } catch {
+    return new Response(JSON.stringify({ found: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
