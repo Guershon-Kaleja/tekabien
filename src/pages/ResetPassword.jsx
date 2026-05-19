@@ -9,14 +9,31 @@ export default function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const [setValidSession] = useState(false)
+  const [validSession, setValidSession] = useState(false)
 
   useEffect(() => {
-    supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setValidSession(true)
-      }
-    })
+    // Récupérer le token depuis l'URL
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const accessToken = hashParams.get('access_token')
+    const refreshToken = hashParams.get('refresh_token')
+    const type = hashParams.get('type')
+
+    if (type === 'recovery' && accessToken) {
+      supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }).then(({ error }) => {
+        if (!error) setValidSession(true)
+        else setError('Lien invalide ou expiré — demande un nouveau lien')
+      })
+    } else {
+      // Écouter l'événement PASSWORD_RECOVERY
+      supabase.auth.onAuthStateChange(async (event) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setValidSession(true)
+        }
+      })
+    }
   }, [])
 
   const handleReset = async () => {
@@ -26,6 +43,10 @@ export default function ResetPassword() {
     }
     if (password !== confirm) {
       setError('Les mots de passe ne correspondent pas')
+      return
+    }
+    if (!validSession) {
+      setError('Session invalide — demande un nouveau lien de réinitialisation')
       return
     }
     setError('')
