@@ -18,7 +18,6 @@ serve(async (req) => {
     const expectedSecret = Deno.env.get('WEBHOOK_SECRET')
 
     if (!secret || secret !== expectedSecret) {
-      console.log('❌ Secret invalide')
       return new Response(JSON.stringify({ error: 'Non autorisé' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 401,
@@ -31,14 +30,12 @@ serve(async (req) => {
     try {
       body = JSON.parse(rawBody)
     } catch (e) {
-      console.log('Parse error:', String(e))
+
     }
 
     const statusCode = parseInt(body?.results?.status?.code)
     const orderNumber = body?.orderNumber
     const reference = body?.reference
-
-    console.log('=== Callback reçu — orderNumber:', orderNumber, 'statusCode:', statusCode, '===')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -47,7 +44,7 @@ serve(async (req) => {
 
     const identifier = orderNumber || reference
     if (!identifier) {
-      console.log('Pas de référence trouvée')
+     
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -73,8 +70,6 @@ serve(async (req) => {
       if (byOrder) payment = byOrder
     }
 
-    console.log('Payment trouvé:', payment?.id, 'status:', payment?.status, 'duration:', payment?.duration)
-
     if (payment && payment.status === 'pending' && statusCode === 2) {
 
       await supabase
@@ -92,12 +87,9 @@ serve(async (req) => {
       const currentExpires = currentUser?.plan_expires ? new Date(currentUser.plan_expires) : null
       const baseDate = currentExpires && currentExpires > now ? currentExpires : now
 
-      // Calculer la durée en jours selon le nombre de mois
       const duration = payment.duration || 1
-      const daysToAdd = duration * 30
-
       const expires = new Date(baseDate)
-      expires.setDate(expires.getDate() + daysToAdd)
+      expires.setMonth(expires.getMonth() + duration)
 
       await supabase
         .from('users')
@@ -107,17 +99,14 @@ serve(async (req) => {
         })
         .eq('id', payment.user_id)
 
-      console.log('✅ Plan activé — plan:', payment.plan, 'duration:', duration, 'mois expires:', expires.toISOString())
-
     } else if (payment && payment.status === 'pending' && statusCode === 3) {
       await supabase
         .from('payments')
         .update({ status: 'failed' })
         .eq('id', payment.id)
 
-      console.log('❌ Paiement échoué')
     } else {
-      console.log('Ignoré — status:', payment?.status, 'statusCode:', statusCode)
+      
     }
 
     return new Response(JSON.stringify({ received: true }), {
@@ -126,7 +115,7 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.log('Erreur callback:', String(error))
+    
     return new Response(JSON.stringify({ received: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

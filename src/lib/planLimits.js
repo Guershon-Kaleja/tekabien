@@ -5,7 +5,6 @@ export const PLAN_LIMITS = {
     maxClients: 3,
     canExportPDF: false,
     canViewReports: false,
-    canSendSMS: false,
   },
   trial: {
     maxSalesPerDay: Infinity,
@@ -13,7 +12,6 @@ export const PLAN_LIMITS = {
     maxClients: Infinity,
     canExportPDF: true,
     canViewReports: true,
-    canSendSMS: false,
   },
   pro: {
     maxSalesPerDay: Infinity,
@@ -21,15 +19,6 @@ export const PLAN_LIMITS = {
     maxClients: Infinity,
     canExportPDF: true,
     canViewReports: true,
-    canSendSMS: false,
-  },
-  business: {
-    maxSalesPerDay: Infinity,
-    maxProducts: Infinity,
-    maxClients: Infinity,
-    canExportPDF: true,
-    canViewReports: true,
-    canSendSMS: true,
   },
 }
 

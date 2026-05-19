@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { validateClient, sanitize } from '../lib/validation'
+import { sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
@@ -40,16 +40,6 @@ export default function Clients() {
   const { formatAmount, currency } = useCurrency()
 
   useEffect(() => { fetchClients() }, [])
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (document.activeElement.tagName !== 'INPUT') {
-        window.scrollTo(0, 0)
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
 
   const fetchClients = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -284,8 +274,6 @@ export default function Clients() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            onBlur={() => window.scrollTo(0, 0)}
             placeholder="Chercher un client..."
             className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
           />

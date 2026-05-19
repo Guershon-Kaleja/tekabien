@@ -7,20 +7,19 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')
 const CALLBACK_URL = `${SUPABASE_URL}/functions/v1/payment-callback?secret=${WEBHOOK_SECRET}`
 
-// Plan Pro uniquement
 const PLAN_PRICES = {
   pro: {
     USD: { 
       1: 4.67, 
-      3: 12.61,   // 4.67 × 3 × 0.90
-      6: 23.82,   // 4.67 × 6 × 0.85
-      12: 44.83   // 4.67 × 12 × 0.80
+      3: 12.61,   
+      6: 23.82,   
+      12: 44.83   
     },
     CDF: { 
       1: 11215,    
-      3: 30281,    // 11215 × 3 × 0.90
-      6: 57197,    // 11215 × 6 × 0.85
-      12: 107664   // 11215 × 12 × 0.80
+      3: 30281,    
+      6: 57197,    
+      12: 107664   
     },
   },
 }
@@ -67,7 +66,6 @@ serve(async (req) => {
 
       const userId = user.id
 
-      // Seul le plan Pro est accepté
       if (plan !== 'pro') {
         return new Response(JSON.stringify({ success: false, message: 'Plan invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -110,7 +108,6 @@ serve(async (req) => {
         })
       }
 
-      // Rate limiting — max 3 tentatives en 10 minutes
       const { data: recentPayments } = await supabase
         .from('payments')
         .select('id')
@@ -136,8 +133,6 @@ serve(async (req) => {
         callback: CALLBACK_URL,
       }
 
-      console.log('=== Paiement initié — plan: pro, duration:', duration, 'currency:', currency, 'amount:', serverAmount, '===')
-
       const response = await fetch(`${LABYRINTHE_BASE_URL}/payment/mobile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -145,8 +140,6 @@ serve(async (req) => {
       })
 
       const data = await response.json()
-
-      console.log('Réponse Labyrinthe — success:', data?.success, 'orderNumber:', data?.orderNumber)
 
       if (data?.success) {
         await supabase.from('payments').insert({

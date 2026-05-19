@@ -121,16 +121,6 @@ export default function Ventes() {
     if (activeTab === 'history' && historyFilter !== 'custom') fetchAllSales()
   }, [activeTab, historyFilter])
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (document.activeElement.tagName !== 'INPUT') {
-        window.scrollTo(0, 0)
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
   const filtered = products.filter(p =>
     p.name.toLowerCase().includes(search.toLowerCase())
   )
@@ -320,8 +310,6 @@ export default function Ventes() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-                onBlur={() => window.scrollTo(0, 0)}
                 placeholder="Chercher un produit..."
                 className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
               />
@@ -535,8 +523,6 @@ export default function Ventes() {
             <input
               value={historySearch}
               onChange={(e) => setHistorySearch(e.target.value)}
-              onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-              onBlur={() => window.scrollTo(0, 0)}
               placeholder="Chercher dans l'historique..."
               className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
             />

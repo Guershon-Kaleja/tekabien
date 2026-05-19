@@ -71,27 +71,27 @@ export default function Dashboard() {
       .gte('created_at', startOfDay.toISOString())
       .order('created_at', { ascending: false })
 
-    if (salesData) {
-      const encaissees = salesData.filter(s => s.encaissee !== false)
-      const credits = salesData.filter(s => s.encaissee === false)
-      setTodaySales(encaissees.reduce((sum, s) => sum + s.total, 0))
-      setSalesCount(encaissees.length)
-      setCreditPending(credits.length)
-      setLastSales(salesData.slice(0, 3))
-    }
-
     const { data: expensesData } = await supabase
       .from('expenses')
       .select('amount')
       .eq('user_id', user.id)
       .gte('created_at', startOfDay.toISOString())
 
-    if (salesData && expensesData) {
+    if (salesData) {
       const encaissees = salesData.filter(s => s.encaissee !== false)
+      const credits = salesData.filter(s => s.encaissee === false)
       const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
       const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
-      const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
-      setNetProfit(totalSales - totalCost - totalExpenses)
+      
+      setTodaySales(totalSales)
+      setSalesCount(encaissees.length)
+      setCreditPending(credits.length)
+      setLastSales(salesData.slice(0, 3))
+
+      if (expensesData) {
+        const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
+        setNetProfit(totalSales - totalCost - totalExpenses)
+      }
     }
 
     const { data: customersData } = await supabase

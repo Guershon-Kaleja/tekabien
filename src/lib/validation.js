@@ -28,7 +28,6 @@ export const validateClient = (form) => {
   if (form.phone) {
     const clean = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
 
-    // 9 chiffres sans 0 au début → on peut ajouter 0
     const normalized = (clean.length === 9 && !clean.startsWith('0'))
       ? '0' + clean
       : clean

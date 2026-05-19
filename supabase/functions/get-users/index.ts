@@ -55,7 +55,6 @@ serve(async (req) => {
 
     if (error) throw error
 
-    // Payments ce mois
     const startOfMonth = new Date()
     startOfMonth.setDate(1)
     startOfMonth.setHours(0, 0, 0, 0)

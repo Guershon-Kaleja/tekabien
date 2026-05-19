@@ -11,7 +11,7 @@ export default function Profil() {
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState(null)
   const [form, setForm] = useState({ shop_name: '', phone: '', currency: 'FC' })
-  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' })
+  const [passwordForm, setPasswordForm] = useState({ new: '', confirm: '' })
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [passwordError, setPasswordError] = useState('')

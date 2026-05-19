@@ -33,16 +33,6 @@ export default function Stocks() {
 
   useEffect(() => { fetchProducts() }, [])
 
-  useEffect(() => {
-    const handleResize = () => {
-      if (document.activeElement.tagName !== 'INPUT') {
-        window.scrollTo(0, 0)
-      }
-    }
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
   const fetchProducts = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -208,8 +198,6 @@ export default function Stocks() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onFocus={(e) => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' })}
-            onBlur={() => window.scrollTo(0, 0)}
             placeholder="Chercher un produit..."
             className="flex-1 text-sm outline-none text-[#0F172A] placeholder-gray-400"
           />

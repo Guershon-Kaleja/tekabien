@@ -32,8 +32,6 @@ export const initiatePayment = async ({ phone, plan, currency = 'USD', duration 
       duration: parseInt(duration) || 1,
     }
 
-    console.log('Payload envoyé — plan:', plan, 'duration:', duration, 'currency:', currency)
-
     const response = await fetch(FUNCTION_URL, {
       method: 'POST',
       headers,

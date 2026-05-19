@@ -9,13 +9,11 @@ export default function usePlanCheck() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('users')
       .select('plan, plan_expires, role')
       .eq('id', user.id)
       .single()
-
-    console.log('PlanCheck data:', data, 'error:', error)
 
     if (!data) return
 
@@ -30,7 +28,7 @@ export default function usePlanCheck() {
       const expires = new Date(data.plan_expires)
       const gracePeriod = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
       if (new Date() > gracePeriod) {
-        // Passer automatiquement en free — accès dashboard avec limites
+        
         await supabase
           .from('users')
           .update({ plan: 'free' })
@@ -38,8 +36,6 @@ export default function usePlanCheck() {
         return
       }
     }
-
-    // plan === 'free' → accès au dashboard avec limites ✅
   }
 
   useEffect(() => {

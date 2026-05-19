@@ -166,7 +166,7 @@ export default function Rapports() {
 
   const exportPDF = async () => {
     if (userPlan === 'free' || userPlan === 'trial') {
-      alert('Export PDF disponible uniquement pour les plans Pro et Business.')
+      navigate('/expired')
       return
     }
 
@@ -320,7 +320,6 @@ export default function Rapports() {
         y += 8
       }
 
-      // Ventes crédit en attente
       if (stats.creditPending > 0) {
         doc.setFillColor(255, 251, 235)
         doc.roundedRect(margin, y, pageWidth - margin * 2, 18, 3, 3, 'F')
@@ -337,7 +336,6 @@ export default function Rapports() {
         y += 22
       }
 
-      // Pied de page
       const pageHeight = doc.internal.pageSize.getHeight()
       doc.setFillColor(26, 86, 219)
       doc.rect(0, pageHeight - 15, pageWidth, 15, 'F')
@@ -449,7 +447,7 @@ export default function Rapports() {
             onClick={exportPDF}
             disabled={exporting}
             className={`w-full rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 mb-4 ${
-              userPlan === 'pro' || userPlan === 'business'
+              userPlan === 'pro' 
                 ? 'bg-[#0F172A] text-white'
                 : 'bg-gray-100 text-[#64748B] border border-gray-200'
             } disabled:opacity-50`}
@@ -459,7 +457,7 @@ export default function Rapports() {
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Génération du PDF...
               </>
-            ) : userPlan === 'pro' || userPlan === 'business' ? (
+            ) : userPlan === 'pro'  ? (
               '📄 Exporter en PDF'
             ) : (
               '📄 Export PDF — Pro uniquement'

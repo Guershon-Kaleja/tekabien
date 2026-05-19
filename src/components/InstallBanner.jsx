@@ -4,11 +4,11 @@ export default function InstallBanner() {
   const [show, setShow] = useState(false)
 
   useEffect(() => {
-    // Détecter iOS
+    
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    // Détecter si déjà installé en PWA
+    
     const isInstalled = window.navigator.standalone === true
-    // Détecter si déjà fermé
+    
     const dismissed = localStorage.getItem('ios_banner_dismissed')
 
     if (isIOS && !isInstalled && !dismissed) {

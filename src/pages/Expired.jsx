@@ -57,7 +57,7 @@ export default function Expired() {
       if (data) {
         setCurrentPlan(data.plan)
         setPreviousExpiry(data.plan_expires)
-        if (data.plan === 'pro') {
+        if ((data.plan === 'pro' || data.plan === 'trial') && data.plan_expires) {
           const expires = new Date(data.plan_expires)
           const grace = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
           if (new Date() < grace) setHasActivePlan(true)

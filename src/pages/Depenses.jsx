@@ -63,7 +63,7 @@ export default function Depenses() {
 
     const { data: salesData } = await supabase
       .from('sales')
-      .select('total, cost')
+      .select('total, cost, encaissee')
       .eq('user_id', user.id)
       .gte('created_at', since)
 
@@ -129,8 +129,9 @@ export default function Depenses() {
     }
   }
 
-  const totalIncome = sales.reduce((sum, s) => sum + s.total, 0)
-  const totalCost = sales.reduce((sum, s) => sum + (s.cost || 0), 0)
+  const encaissees = sales.filter(s => s.encaissee !== false)
+  const totalIncome = encaissees.reduce((sum, s) => sum + s.total, 0)
+  const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
   const netProfit = totalIncome - totalCost - totalExpenses
 
