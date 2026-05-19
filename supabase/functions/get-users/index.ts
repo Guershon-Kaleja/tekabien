@@ -49,9 +49,9 @@ serve(async (req) => {
     }
 
     const { data: users, error } = await supabaseAdmin
-      .from('users')
-      .select('*')
-      .order('created_at', { ascending: false })
+    .from('users')
+    .select('id, shop_name, email, phone, plan, plan_expires, created_at, role, currency')
+    .order('created_at', { ascending: false })
 
     if (error) throw error
 
