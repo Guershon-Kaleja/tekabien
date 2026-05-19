@@ -20,10 +20,22 @@ export default function Profil() {
   const [userPlan, setUserPlan] = useState(null)
   const [planExpires, setPlanExpires] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [payments, setPayments] = useState([])
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletingAccount, setDeletingAccount] = useState(false)
 
   useEffect(() => { fetchProfile() }, [])
 
   const fetchProfile = async () => {
+    
+    const { data: paymentsData } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .order('created_at', { ascending: false })
+
+    if (paymentsData) setPayments(paymentsData)
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (!authUser) return
     setUser(authUser)
@@ -107,6 +119,34 @@ export default function Profil() {
     setSaving(false)
   }
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') return
+    setDeletingAccount(true)
+
+    try {
+      // Supprimer les données dans l'ordre
+      await supabase.from('sales').delete().eq('user_id', user.id)
+      await supabase.from('products').delete().eq('user_id', user.id)
+      await supabase.from('debt_payments').delete().eq('user_id', user.id)
+      await supabase.from('debts').delete().eq('user_id', user.id)
+      await supabase.from('customers').delete().eq('user_id', user.id)
+      await supabase.from('expenses').delete().eq('user_id', user.id)
+      
+      await supabase.from('payments')
+        .update({ user_id: null })
+        .eq('user_id', user.id)
+
+      await supabase.from('users').delete().eq('id', user.id)
+
+      await supabase.auth.signOut()
+      navigate('/login')
+
+    } catch {
+      setDeletingAccount(false)
+      setShowDeleteAccount(false)
+    }
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     navigate('/login')
@@ -148,6 +188,7 @@ export default function Profil() {
           { id: 'profil', label: '👤 Profil' },
           { id: 'securite', label: '🔒 Sécurité' },
           { id: 'abonnement', label: '💳 Abonnement' },
+          { id: 'paiements', label: '📋 Paiements' },
         ].map((t) => (
           <button
             key={t.id}
@@ -275,6 +316,58 @@ export default function Profil() {
             >
               Se déconnecter
             </button>
+
+            {/* Bouton suppression compte */}
+            <button
+              onClick={() => setShowDeleteAccount(true)}
+              className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm mt-3"
+            >
+              🗑️ Supprimer mon compte
+            </button>
+
+            {/* Modal confirmation suppression */}
+            {showDeleteAccount && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+                <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+                  <div className="text-center mb-4">
+                    <p className="text-3xl mb-3">⚠️</p>
+                    <h2 className="text-base font-bold text-[#0F172A]">Supprimer mon compte ?</h2>
+                    <p className="text-sm text-[#64748B] mt-2 leading-relaxed">
+                      Toutes tes données seront supprimées définitivement — ventes, stocks, clients, dépenses.
+                    </p>
+                    <p className="text-xs text-[#64748B] mt-2">
+                      Tes informations de paiement seront conservées pour nos archives.
+                    </p>
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-[#64748B] mb-2">
+                        Tape <span className="text-[#DC2626] font-bold">SUPPRIMER</span> pour confirmer
+                      </p>
+                      <input
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="SUPPRIMER"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#DC2626] text-center font-bold"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText('') }}
+                      className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== 'SUPPRIMER' || deletingAccount}
+                      className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+                    >
+                      {deletingAccount ? 'Suppression...' : 'Supprimer'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Modal confirmation déconnexion */}
             {showLogoutConfirm && (
@@ -473,6 +566,51 @@ export default function Profil() {
               </div>
             )}
           </>
+        )}
+
+        {activeTab === 'paiements' && (
+          <div>
+            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
+              Historique des paiements
+            </p>
+            {payments.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-3xl mb-2">💳</p>
+                <p className="text-sm font-semibold text-[#0F172A]">Aucun paiement</p>
+                <p className="text-xs text-[#64748B] mt-1">Tes paiements apparaîtront ici</p>
+              </div>
+            ) : (
+              payments.map((p) => (
+                <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-4 mb-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-bold text-[#0F172A]">Plan Pro — {p.duration} mois</p>
+                      <p className="text-xs text-[#64748B]">
+                        {new Date(p.created_at).toLocaleDateString('fr-FR')}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                      p.status === 'completed' 
+                        ? 'bg-[#F0FDF4] text-[#16A34A]' 
+                        : p.status === 'pending'
+                        ? 'bg-[#FFFBEB] text-[#B45309]'
+                        : 'bg-[#FEF2F2] text-[#DC2626]'
+                    }`}>
+                      {p.status === 'completed' ? '✅ Payé' : p.status === 'pending' ? '⏳ En attente' : '❌ Échoué'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-[#1A56DB]">
+                      {p.currency === 'USD' ? `$${p.amount}` : `${p.amount.toLocaleString('fr-FR')} FC`}
+                    </p>
+                    <p className="text-xs text-[#64748B]">
+                      {p.duration} mois × {p.currency === 'USD' ? '5$' : '12 000 FC'}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         )}
 
       </div>
