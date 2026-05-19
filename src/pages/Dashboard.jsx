@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
-import * as Sentry from '@sentry/react'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -185,12 +184,6 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
-       <button 
-          onClick={() => Sentry.captureException(new Error('Test Sentry TekaBien'))}
-          className="bg-red-500 text-white px-3 py-1 rounded text-xs mb-2"
-        >
-          Test Sentry
-        </button>
 
       <div className="bg-[#1A56DB] px-4 pt-4 pb-4">
         <div className="flex items-center justify-between mb-3">
