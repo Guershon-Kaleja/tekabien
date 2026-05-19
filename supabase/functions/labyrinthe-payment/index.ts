@@ -88,6 +88,14 @@ serve(async (req) => {
         })
       }
 
+      const cleanPhone = phone?.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+      if (!cleanPhone || !/^\d{10}$/.test(cleanPhone) || !/^0[7-9]/.test(cleanPhone)) {
+        return new Response(JSON.stringify({ success: false, message: 'Numéro de téléphone invalide' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
       const serverAmount = PLAN_PRICES.pro[currency][parseInt(duration)]
 
       const supabase = createClient(
@@ -126,7 +134,7 @@ serve(async (req) => {
 
       const payloadToLabyrinthe = {
         token: LABYRINTHE_TOKEN,
-        phone,
+        phone: cleanPhone, 
         amount: serverAmount,
         currency,
         country: 'CD',
