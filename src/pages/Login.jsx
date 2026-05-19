@@ -77,7 +77,7 @@ export default function Login() {
         language: 'fr',
         role: 'user',
         plan: 'trial',
-        plan_expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        plan_expires: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
       })
       navigate('/onboarding')
     }
