@@ -49,9 +49,42 @@ serve(async (req) => {
 
     const { action, userId, plan, months = 1 } = await req.json()
 
+    // Validation userId
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'userId manquant' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
+    // Validation action
+    if (!['activate', 'disable'].includes(action)) {
+      return new Response(JSON.stringify({ error: 'Action invalide' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
+    }
+
     if (action === 'activate') {
+      const validPlans = ['pro', 'trial', 'free']
+      const validMonths = [1, 3, 6, 12]
+
+      if (!validPlans.includes(plan)) {
+        return new Response(JSON.stringify({ error: 'Plan invalide' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
+      if (!validMonths.includes(parseInt(months))) {
+        return new Response(JSON.stringify({ error: 'Durée invalide' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        })
+      }
+
       const expires = new Date()
-      expires.setMonth(expires.getMonth() + months)
+      expires.setMonth(expires.getMonth() + parseInt(months))
       await supabaseAdmin.from('users')
         .update({ plan, plan_expires: expires.toISOString() })
         .eq('id', userId)
