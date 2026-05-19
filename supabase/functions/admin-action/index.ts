@@ -49,9 +49,10 @@ serve(async (req) => {
 
     const { action, userId, plan, months = 1 } = await req.json()
 
-    // Validation userId
-    if (!userId) {
-      return new Response(JSON.stringify({ error: 'userId manquant' }), {
+    // Validation UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!userId || !uuidRegex.test(userId)) {
+      return new Response(JSON.stringify({ error: 'userId invalide' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
       })

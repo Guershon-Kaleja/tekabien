@@ -22,8 +22,10 @@ serve(async (req) => {
       })
     }
 
+    // Validation numéro côté serveur
     const cleanPhone = phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
     if (!/^\d{10}$/.test(cleanPhone) || !/^0[7-9]/.test(cleanPhone)) {
+      await new Promise(resolve => setTimeout(resolve, 500))
       return new Response(JSON.stringify({ found: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
@@ -45,18 +47,21 @@ serve(async (req) => {
     const email = data?.email
 
     if (!email) {
+      await new Promise(resolve => setTimeout(resolve, 500))
       return new Response(JSON.stringify({ found: false }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
     }
 
+    await new Promise(resolve => setTimeout(resolve, 500))
     return new Response(JSON.stringify({ found: true, email }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch {
+    await new Promise(resolve => setTimeout(resolve, 500))
     return new Response(JSON.stringify({ found: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
