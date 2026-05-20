@@ -20,6 +20,9 @@ export default function Depenses() {
   const [editForm, setEditForm] = useState({ category: 'marchandises', amount: '', note: '' })
   const [editErrors, setEditErrors] = useState({})
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null)
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [showCustom, setShowCustom] = useState(false)
 
   const { formatAmount, currency } = useCurrency()
 
@@ -43,8 +46,14 @@ export default function Depenses() {
     const start = new Date()
     if (period === 'today') start.setHours(0, 0, 0, 0)
     else if (period === 'week') start.setDate(now.getDate() - 7)
-    else if (period === 'month') start.setDate(1)
-    return start.toISOString()
+    else if (period === 'month') { start.setDate(1); start.setHours(0, 0, 0, 0) }
+    else if (period === 'custom') {
+      return {
+        start: customStart ? new Date(customStart).toISOString() : new Date().toISOString(),
+        end: customEnd ? new Date(customEnd + 'T23:59:59').toISOString() : new Date(customStart + 'T23:59:59').toISOString(),
+      }
+    }
+    return { start: start.toISOString(), end: new Date().toISOString() }
   }
 
   const fetchData = async () => {
@@ -52,20 +61,22 @@ export default function Depenses() {
     if (!user) return
     setUserId(user.id)
 
-    const since = getDateRange()
+    const { start, end } = getDateRange()
 
     const { data: expData } = await supabase
       .from('expenses')
       .select('*')
       .eq('user_id', user.id)
-      .gte('created_at', since)
+      .gte('created_at', start)
+      .lte('created_at', end)
       .order('created_at', { ascending: false })
 
     const { data: salesData } = await supabase
       .from('sales')
       .select('total, cost, encaissee')
       .eq('user_id', user.id)
-      .gte('created_at', since)
+      .gte('created_at', start)
+      .lte('created_at', end)
 
     if (expData) setExpenses(expData)
     if (salesData) setSales(salesData)
@@ -194,13 +205,18 @@ export default function Depenses() {
 
         <div className="flex gap-2 mb-4">
           {[
-            { id: 'today', label: "Aujourd'hui" },
-            { id: 'week', label: 'Semaine' },
-            { id: 'month', label: 'Mois' },
+            { id: 'today', label: "Auj." },
+            { id: 'week', label: '7 jours' },
+            { id: 'month', label: 'Ce mois' },
+            { id: 'custom', label: '📅 Date' },
           ].map((p) => (
             <button
               key={p.id}
-              onClick={() => setPeriod(p.id)}
+              onClick={() => {
+                setPeriod(p.id)
+                if (p.id === 'custom') setShowCustom(true)
+                else setShowCustom(false)
+              }}
               className={`flex-1 py-2 rounded-xl text-xs font-medium border transition-all ${
                 period === p.id
                   ? 'bg-[#1A56DB] text-white border-[#1A56DB]'
@@ -397,6 +413,52 @@ export default function Depenses() {
           </div>
         </div>
       )}
+
+      {showCustom && (
+          <div className="fixed inset-0 bg-black/50 flex items-end z-50">
+            <div className="bg-white rounded-t-2xl w-full px-5 pt-5 pb-10">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="text-base font-bold text-[#0F172A]">📅 Choisir une période</h2>
+                <button
+                  onClick={() => { setShowCustom(false); setPeriod('today') }}
+                  className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-[#64748B]"
+                >✕</button>
+              </div>
+              <div className="mb-4">
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Du</label>
+                <input
+                  type="date"
+                  value={customStart}
+                  onChange={(e) => setCustomStart(e.target.value)}
+                  style={{ WebkitAppearance: 'none' }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+                />
+              </div>
+              <div className="mb-6">
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Au (optionnel)</label>
+                <input
+                  type="date"
+                  value={customEnd}
+                  onChange={(e) => setCustomEnd(e.target.value)}
+                  style={{ WebkitAppearance: 'none' }}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-4 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  if (!customStart) return
+                  if (!customEnd) setCustomEnd(customStart)
+                  setShowCustom(false)
+                  fetchData()
+                }}
+                disabled={!customStart}
+                className="w-full bg-[#1A56DB] text-white rounded-xl py-4 text-sm font-bold disabled:opacity-50"
+              >
+                Voir les dépenses
+              </button>
+            </div>
+          </div>
+        )}
 
       <Navbar />
 
