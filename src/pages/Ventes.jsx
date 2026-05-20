@@ -38,6 +38,7 @@ export default function Ventes() {
   const [historyCustomEnd, setHistoryCustomEnd] = useState('')
   const [showHistoryCustom, setShowHistoryCustom] = useState(false)
   const [showCancelConfirm, setShowCancelConfirm] = useState(null)
+  const [creditDueDate, setCreditDueDate] = useState('')
   const [cancelling, setCancelling] = useState(false)
 
   const { formatAmount } = useCurrency()
@@ -177,9 +178,13 @@ export default function Ventes() {
 
       if (payment === 'credit' && selectedClient) {
         await supabase.from('debts').insert({
-          user_id: userId, customer_id: selectedClient.id,
-          amount: total, paid: 0, status: 'pending',
+          user_id: userId,
+          customer_id: selectedClient.id,
+          amount: total,
+          paid: 0,
+          status: 'pending',
           note: `Vente crédit — ${sanitize(selected.name)}`,
+          due_date: creditDueDate || null,
         })
         await supabase.from('customers')
           .update({ total_debt: selectedClient.total_debt + total })
@@ -189,8 +194,13 @@ export default function Ventes() {
       setSuccess(true)
       setTodaySalesCount(prev => prev + 1)
       setTimeout(() => {
-        setSuccess(false); setSelected(null); setQuantity(1)
-        setPayment('cash'); setSelectedClient(null); setError('')
+        setSuccess(false)
+        setSelected(null)
+        setQuantity(1)
+        setPayment('cash')
+        setSelectedClient(null)
+        setError('')
+        setCreditDueDate('') 
         fetchData()
       }, 1500)
     } else {
@@ -717,6 +727,20 @@ export default function Ventes() {
               )}
             </div>
           </div>
+        </div>
+      )}
+      {payment === 'credit' && selectedClient && (
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+            Date de remboursement (optionnel)
+          </label>
+          <input
+            type="date"
+            value={creditDueDate}
+            onChange={(e) => setCreditDueDate(e.target.value)}
+            style={{ WebkitAppearance: 'none' }}
+            className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+          />
         </div>
       )}
 

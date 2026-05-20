@@ -27,7 +27,7 @@ export default function Clients() {
   const [selectedClient, setSelectedClient] = useState(null)
   const [form, setForm] = useState({ name: '' })
   const [editForm, setEditForm] = useState({ name: '' })
-  const [debtForm, setDebtForm] = useState({ amount: '', note: '' })
+  const [debtForm, setDebtForm] = useState({ amount: '', note: '', due_date: '' })
   const [payForm, setPayForm] = useState({ amount: '', note: '' })
   const [editDebtAmount, setEditDebtAmount] = useState('')
   const [debtHistory, setDebtHistory] = useState([])
@@ -142,6 +142,7 @@ export default function Clients() {
       customer_id: selectedClient.id,
       amount, paid: 0, status: 'pending',
       note: sanitize(debtForm.note),
+      due_date: debtForm.due_date || null,
     })
     if (!error) {
       await supabase.from('customers')
@@ -534,6 +535,21 @@ export default function Clients() {
                   placeholder="Ex: Achat sucre et savon"
                   className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB]"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-1">
+                  Date de remboursement (optionnel)
+                </label>
+                <input
+                  type="date"
+                  value={debtForm.due_date}
+                  onChange={(e) => setDebtForm({ ...debtForm, due_date: e.target.value })}
+                  style={{ WebkitAppearance: 'none' }}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+                />
+                <p className="text-xs text-[#64748B] mt-1">
+                  Une notification de rappel sera envoyée à cette date
+                </p>
               </div>
             </div>
             <button onClick={handleAddDebt} className="w-full bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm mt-4">
