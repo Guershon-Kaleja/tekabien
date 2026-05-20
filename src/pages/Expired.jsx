@@ -190,7 +190,7 @@ export default function Expired() {
               ? 'Continue à utiliser TekaBien sans interruption'
               : currentPlan === 'free'
               ? 'Débloque toutes les fonctionnalités'
-              : 'Ton essai gratuit de 30 jours est expiré'}
+              : 'Ton essai gratuit de 14 jours est expiré'}
           </p>
           {hasActivePlan && (
             <span className="inline-block mt-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">

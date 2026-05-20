@@ -27,15 +27,7 @@ export default function Profil() {
 
   useEffect(() => { fetchProfile() }, [])
 
-  const fetchProfile = async () => {
-    
-    const { data: paymentsData } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', authUser.id)
-      .order('created_at', { ascending: false })
-
-    if (paymentsData) setPayments(paymentsData)
+ const fetchProfile = async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (!authUser) return
     setUser(authUser)
@@ -55,6 +47,14 @@ export default function Profil() {
       setUserPlan(data.plan)
       setPlanExpires(data.plan_expires)
     }
+
+    const { data: paymentsData } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .order('created_at', { ascending: false })
+
+    if (paymentsData) setPayments(paymentsData)
 
     setLoading(false)
   }

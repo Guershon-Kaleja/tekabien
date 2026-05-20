@@ -218,7 +218,7 @@ export default function Login() {
               onClick={() => setTab('signup')}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
             >
-              Essayer gratuitement — 30 jours
+              Essayer gratuitement — 14 jours
             </button>
             <button
               onClick={() => setTab('login')}
@@ -233,7 +233,7 @@ export default function Login() {
           <div className="p-6">
             <div className="flex items-center gap-2 bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-5">
               <span>🎁</span>
-              <p className="text-xs text-[#16A34A] font-medium">30 jours gratuits — aucune carte requise</p>
+              <p className="text-xs text-[#16A34A] font-medium">14 jours gratuits — aucune carte requise</p>
             </div>
 
             {error && (
