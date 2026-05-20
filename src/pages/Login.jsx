@@ -37,6 +37,13 @@ export default function Login() {
       setError("Entre le nom de ton activité")
       return
     }
+    if (form.phone) {
+      const cleanPhone = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+      if (!/^\d{10}$/.test(cleanPhone) || !/^0[7-9]/.test(cleanPhone)) {
+        setError('Numéro invalide — doit commencer par 07x, 08x ou 09x et avoir 10 chiffres')
+        return
+      }
+    }
     if (!form.email || !emailRegex.test(form.email)) {
       setError('Entre une adresse email valide')
       return
