@@ -49,10 +49,11 @@ export default function Profil() {
     }
 
     const { data: paymentsData } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', authUser.id)
-      .order('created_at', { ascending: false })
+    .from('payments')
+    .select('*')
+    .eq('user_id', authUser.id)
+    .eq('status', 'completed') 
+    .order('created_at', { ascending: false })
 
     if (paymentsData) setPayments(paymentsData)
 

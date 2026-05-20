@@ -77,7 +77,7 @@ serve(async (req) => {
         })
       }
 
-      if (!validMonths.includes(parseInt(months))) {
+      if (plan !== 'trial' && !validMonths.includes(parseInt(months))) {
         return new Response(JSON.stringify({ error: 'Durée invalide' }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400,
@@ -85,7 +85,13 @@ serve(async (req) => {
       }
 
       const expires = new Date()
-      expires.setMonth(expires.getMonth() + parseInt(months))
+      if (plan === 'trial') {
+        
+        expires.setDate(expires.getDate() + 14)
+      } else {
+        expires.setMonth(expires.getMonth() + parseInt(months))
+      }
+
       await supabaseAdmin.from('users')
         .update({ plan, plan_expires: expires.toISOString() })
         .eq('id', userId)
