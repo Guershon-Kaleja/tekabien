@@ -58,23 +58,24 @@ export default function Ventes() {
     if (!user) return
     setUserId(user.id)
 
-    const { data: userData } = await supabase
-      .from('users').select('plan').eq('id', user.id).single()
-    if (userData) setUserPlan(userData.plan)
-
-    const { data: productsData } = await supabase
-      .from('products').select('*').eq('user_id', user.id).order('name')
-    if (productsData) setProducts(productsData)
-
-    const { data: clientsData } = await supabase
-      .from('customers').select('*').eq('user_id', user.id).order('name')
-    if (clientsData) setClients(clientsData)
-
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
-    const { data: salesData } = await supabase
-      .from('sales').select('id').eq('user_id', user.id)
-      .gte('created_at', startOfDay.toISOString())
+
+    const [
+      { data: userData },
+      { data: productsData },
+      { data: clientsData },
+      { data: salesData },
+    ] = await Promise.all([
+      supabase.from('users').select('plan').eq('id', user.id).single(),
+      supabase.from('products').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('customers').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('sales').select('id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
+    ])
+
+    if (userData) setUserPlan(userData.plan)
+    if (productsData) setProducts(productsData)
+    if (clientsData) setClients(clientsData)
     if (salesData) setTodaySalesCount(salesData.length)
   }
 

@@ -38,19 +38,16 @@ export default function Stocks() {
     if (!user) return
     setUserId(user.id)
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('plan')
-      .eq('id', user.id)
-      .single()
-    if (userData) setUserPlan(userData.plan)
+    const [
+      { data: userData },
+      { data: productsData },
+    ] = await Promise.all([
+      supabase.from('users').select('plan').eq('id', user.id).single(),
+      supabase.from('products').select('*').eq('user_id', user.id).order('name'),
+    ])
 
-    const { data } = await supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('name')
-    if (data) setProducts(data)
+    if (userData) setUserPlan(userData.plan)
+    if (productsData) setProducts(productsData)
     setLoading(false)
   }
 

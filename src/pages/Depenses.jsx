@@ -63,20 +63,13 @@ export default function Depenses() {
 
     const { start, end } = getDateRange()
 
-    const { data: expData } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', start)
-      .lte('created_at', end)
-      .order('created_at', { ascending: false })
-
-    const { data: salesData } = await supabase
-      .from('sales')
-      .select('total, cost, encaissee')
-      .eq('user_id', user.id)
-      .gte('created_at', start)
-      .lte('created_at', end)
+    const [
+      { data: expData },
+      { data: salesData },
+    ] = await Promise.all([
+      supabase.from('expenses').select('*').eq('user_id', user.id).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false }),
+      supabase.from('sales').select('total, cost, encaissee').eq('user_id', user.id).gte('created_at', start).lte('created_at', end),
+    ])
 
     if (expData) setExpenses(expData)
     if (salesData) setSales(salesData)

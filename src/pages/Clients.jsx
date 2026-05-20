@@ -46,13 +46,16 @@ export default function Clients() {
     if (!user) return
     setUserId(user.id)
 
-    const { data: userData } = await supabase
-      .from('users').select('plan').eq('id', user.id).single()
-    if (userData) setUserPlan(userData.plan)
+    const [
+      { data: userData },
+      { data: clientsData },
+    ] = await Promise.all([
+      supabase.from('users').select('plan').eq('id', user.id).single(),
+      supabase.from('customers').select('*').eq('user_id', user.id).order('name'),
+    ])
 
-    const { data } = await supabase
-      .from('customers').select('*').eq('user_id', user.id).order('name')
-    if (data) setClients(data)
+    if (userData) setUserPlan(userData.plan)
+    if (clientsData) setClients(clientsData)
     setLoading(false)
   }
 

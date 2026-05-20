@@ -37,11 +37,13 @@ export default function Profil() {
     if (!authUser) return
     setUser(authUser)
 
-    const { data } = await supabase
-      .from('users')
-      .select('shop_name, phone, plan, plan_expires, currency')
-      .eq('id', authUser.id)
-      .single()
+    const [
+      { data },
+      { data: paymentsData },
+    ] = await Promise.all([
+      supabase.from('users').select('shop_name, phone, plan, plan_expires, currency').eq('id', authUser.id).single(),
+      supabase.from('payments').select('*').eq('user_id', authUser.id).eq('status', 'completed').order('created_at', { ascending: false }),
+    ])
 
     if (data) {
       setForm({
@@ -52,13 +54,6 @@ export default function Profil() {
       setUserPlan(data.plan)
       setPlanExpires(data.plan_expires)
     }
-
-    const { data: paymentsData } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('user_id', authUser.id)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
 
     if (paymentsData) setPayments(paymentsData)
     setLoading(false)

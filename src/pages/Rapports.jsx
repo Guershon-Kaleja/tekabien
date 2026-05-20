@@ -71,32 +71,22 @@ export default function Rapports() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('shop_name, plan')
-      .eq('id', user.id)
-      .single()
+    const { start, end } = getDateRange()
+
+    const [
+      { data: userData },
+      { data: salesData },
+      { data: expensesData },
+    ] = await Promise.all([
+      supabase.from('users').select('shop_name, plan').eq('id', user.id).single(),
+      supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
+      supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', start).lte('created_at', end),
+    ])
+
     if (userData) {
       setShopName(userData.shop_name)
       setUserPlan(userData.plan)
     }
-
-    const { start, end } = getDateRange()
-
-    const { data: salesData } = await supabase
-      .from('sales')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', start)
-      .lte('created_at', end)
-      .order('created_at', { ascending: true })
-
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('amount')
-      .eq('user_id', user.id)
-      .gte('created_at', start)
-      .lte('created_at', end)
 
     if (salesData && expensesData) {
       const encaissees = salesData.filter(s => s.encaissee !== false)
@@ -142,18 +132,12 @@ export default function Rapports() {
       const salesByDay = Object.values(dayMap)
 
       setStats({
-        totalSales,
-        totalCost,
-        salesCount: encaissees.length,
-        totalExpenses,
-        netProfit,
-        creditPending: credits.length,
-        creditAmount,
-        topProducts,
-        paymentMethods,
-        salesByDay,
+        totalSales, totalCost, salesCount: encaissees.length,
+        totalExpenses, netProfit, creditPending: credits.length,
+        creditAmount, topProducts, paymentMethods, salesByDay,
       })
     }
+
     setLoading(false)
   }
 
