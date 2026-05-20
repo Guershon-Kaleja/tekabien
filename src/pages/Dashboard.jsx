@@ -36,53 +36,41 @@ export default function Dashboard() {
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('shop_name, plan, plan_expires')
-      .eq('id', user.id)
-      .single()
+    const [
+      { data: userData },
+      { data: salesData },
+      { data: expensesData },
+      { data: customersData },
+      { data: productsData },
+    ] = await Promise.all([
+      supabase.from('users').select('shop_name, plan, plan_expires').eq('id', user.id).single(),
+      supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }),
+      supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
+      supabase.from('customers').select('total_debt').eq('user_id', user.id).gt('total_debt', 0),
+      supabase.from('products').select('*').eq('user_id', user.id),
+    ])
 
-   if (userData) {
+    if (userData) {
       setShopName(userData.shop_name)
       setUserPlan(userData.plan)
       setPlanExpires(userData.plan_expires)
 
-      if (userData.plan === 'trial' && userData.plan_expires) {
-        const expires = new Date(userData.plan_expires)
-        const now = new Date()
-        const diff = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
-        setTrialDaysLeft(diff > 0 ? diff : 0)
-      }
-
-      if (userData.plan === 'pro' && userData.plan_expires) {
+      if ((userData.plan === 'trial' || userData.plan === 'pro') && userData.plan_expires) {
         const expires = new Date(userData.plan_expires)
         const now = new Date()
         const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
-        if (daysLeft <= 3 && daysLeft > 0) {
-          setTrialDaysLeft(daysLeft) // réutilise le même state
+        if (userData.plan === 'trial' || daysLeft <= 3) {
+          setTrialDaysLeft(daysLeft > 0 ? daysLeft : 0)
         }
       }
     }
-
-    const { data: salesData } = await supabase
-      .from('sales')
-      .select('*')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfDay.toISOString())
-      .order('created_at', { ascending: false })
-
-    const { data: expensesData } = await supabase
-      .from('expenses')
-      .select('amount')
-      .eq('user_id', user.id)
-      .gte('created_at', startOfDay.toISOString())
 
     if (salesData) {
       const encaissees = salesData.filter(s => s.encaissee !== false)
       const credits = salesData.filter(s => s.encaissee === false)
       const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
       const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
-      
+
       setTodaySales(totalSales)
       setSalesCount(encaissees.length)
       setCreditPending(credits.length)
@@ -94,21 +82,10 @@ export default function Dashboard() {
       }
     }
 
-    const { data: customersData } = await supabase
-      .from('customers')
-      .select('total_debt')
-      .eq('user_id', user.id)
-      .gt('total_debt', 0)
-
     if (customersData) {
       setDebtCount(customersData.length)
       setTotalDebt(customersData.reduce((sum, c) => sum + c.total_debt, 0))
     }
-
-    const { data: productsData } = await supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', user.id)
 
     if (productsData) {
       setLowStock(productsData.filter(p => p.quantity <= p.alert_threshold))
