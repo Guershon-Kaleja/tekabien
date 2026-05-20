@@ -177,20 +177,25 @@ export default function Expired() {
           <h1 className="text-white font-bold text-xl">
             {step === 'success'
               ? 'Paiement confirmé !'
-              : hasActivePlan
+              : hasActivePlan && currentPlan === 'pro'
               ? 'Renouveler mon abonnement'
+              : hasActivePlan && currentPlan === 'trial'
+              ? 'Passer au Pro'
               : currentPlan === 'free'
-              ? 'Passe au Pro'
+              ? 'Passer au Pro'
               : 'Essai terminé'}
           </h1>
+
           <p className="text-blue-200 text-sm mt-1">
             {step === 'success'
               ? 'Ton plan est actif. Redirection...'
-              : hasActivePlan
+              : hasActivePlan && currentPlan === 'pro'
               ? 'Continue à utiliser TekaBien sans interruption'
+              : hasActivePlan && currentPlan === 'trial'
+              ? 'Débloque toutes les fonctionnalités Pro'
               : currentPlan === 'free'
               ? 'Débloque toutes les fonctionnalités'
-              : 'Ton essai gratuit de 14 jours est expiré'}
+              : 'Ton essai gratuit est expiré'}
           </p>
           {hasActivePlan && (
             <span className="inline-block mt-2 text-xs font-bold bg-white/20 text-white px-3 py-1 rounded-full">

@@ -25,9 +25,14 @@ export default function Profil() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
 
+  const DISPLAY_PRICES = {
+    USD: { 1: 5, 3: 13.50, 6: 25.50, 12: 48 },
+    CDF: { 1: 12000, 3: 32400, 6: 61200, 12: 115200 },
+  }
+
   useEffect(() => { fetchProfile() }, [])
 
- const fetchProfile = async () => {
+  const fetchProfile = async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser()
     if (!authUser) return
     setUser(authUser)
@@ -49,14 +54,13 @@ export default function Profil() {
     }
 
     const { data: paymentsData } = await supabase
-    .from('payments')
-    .select('*')
-    .eq('user_id', authUser.id)
-    .eq('status', 'completed') 
-    .order('created_at', { ascending: false })
+      .from('payments')
+      .select('*')
+      .eq('user_id', authUser.id)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
 
     if (paymentsData) setPayments(paymentsData)
-
     setLoading(false)
   }
 
@@ -65,16 +69,15 @@ export default function Profil() {
       setError('Le nom de ta boutique doit avoir au moins 2 caractères')
       return
     }
-     if (form.phone) {
-        const cleanPhone = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
-        if (!/^\d+$/.test(cleanPhone) || cleanPhone.length !== 10 || !/^0[7-9]/.test(cleanPhone)) {
-          setError('Numéro invalide — doit commencer par 07x, 08x ou 09x et avoir 10 chiffres')
-          return
-        }
+    if (form.phone) {
+      const cleanPhone = form.phone.replace(/\s/g, '').replace('+243', '0').replace('+', '')
+      if (!/^\d+$/.test(cleanPhone) || cleanPhone.length !== 10 || !/^0[7-9]/.test(cleanPhone)) {
+        setError('Numéro invalide — doit commencer par 07x, 08x ou 09x et avoir 10 chiffres')
+        return
       }
-
-      setError('')
-      setSaving(true)
+    }
+    setError('')
+    setSaving(true)
 
     const { error } = await supabase
       .from('users')
@@ -91,7 +94,6 @@ export default function Profil() {
       setSuccess('Profil mis à jour avec succès ✅')
       setTimeout(() => setSuccess(''), 3000)
     }
-
     setSaving(false)
   }
 
@@ -113,10 +115,9 @@ export default function Profil() {
       setPasswordError('Erreur — réessaie')
     } else {
       setPasswordSuccess('Mot de passe mis à jour ✅')
-      setPasswordForm({ current: '', new: '', confirm: '' })
+      setPasswordForm({ new: '', confirm: '' })
       setTimeout(() => setPasswordSuccess(''), 3000)
     }
-
     setSaving(false)
   }
 
@@ -125,23 +126,16 @@ export default function Profil() {
     setDeletingAccount(true)
 
     try {
-      // Supprimer les données dans l'ordre
       await supabase.from('sales').delete().eq('user_id', user.id)
       await supabase.from('products').delete().eq('user_id', user.id)
       await supabase.from('debt_payments').delete().eq('user_id', user.id)
       await supabase.from('debts').delete().eq('user_id', user.id)
       await supabase.from('customers').delete().eq('user_id', user.id)
       await supabase.from('expenses').delete().eq('user_id', user.id)
-      
-      await supabase.from('payments')
-        .update({ user_id: null })
-        .eq('user_id', user.id)
-
+      await supabase.from('payments').update({ user_id: null }).eq('user_id', user.id)
       await supabase.from('users').delete().eq('id', user.id)
-
       await supabase.auth.signOut()
       navigate('/login')
-
     } catch {
       setDeletingAccount(false)
       setShowDeleteAccount(false)
@@ -153,23 +147,9 @@ export default function Profil() {
     navigate('/login')
   }
 
-  const getPlanLabel = (plan) => ({
-    trial: 'Essai gratuit',
-    pro: 'Pro',
-    free: 'Gratuit',
-  })[plan] || plan
-
-  const getPlanColor = (plan) => ({
-    trial: '#B45309',
-    pro: '#16A34A',
-    free: '#64748B',
-  })[plan] || '#64748B'
-
-  const getPlanBg = (plan) => ({
-    trial: '#FFFBEB',
-    pro: '#F0FDF4',
-    free: '#F8FAFC',
-  })[plan] || '#F8FAFC'
+  const getPlanLabel = (plan) => ({ trial: 'Essai gratuit', pro: 'Pro', free: 'Gratuit' })[plan] || plan
+  const getPlanColor = (plan) => ({ trial: '#B45309', pro: '#16A34A', free: '#64748B' })[plan] || '#64748B'
+  const getPlanBg = (plan) => ({ trial: '#FFFBEB', pro: '#F0FDF4', free: '#F8FAFC' })[plan] || '#F8FAFC'
 
   if (loading) {
     return (
@@ -195,9 +175,7 @@ export default function Profil() {
             key={t.id}
             onClick={() => setActiveTab(t.id)}
             className={`flex-1 py-3 text-xs font-semibold transition-colors ${
-              activeTab === t.id
-                ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
-                : 'text-[#64748B]'
+              activeTab === t.id ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]' : 'text-[#64748B]'
             }`}
           >
             {t.label}
@@ -213,10 +191,8 @@ export default function Profil() {
               <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-3" />
               <p className="text-base font-bold text-[#0F172A]">{form.shop_name}</p>
               <p className="text-xs text-[#64748B] mt-1">{user?.email}</p>
-              <span
-                className="inline-block text-xs font-semibold px-3 py-1 rounded-full mt-2"
-                style={{ background: getPlanBg(userPlan), color: getPlanColor(userPlan) }}
-              >
+              <span className="inline-block text-xs font-semibold px-3 py-1 rounded-full mt-2"
+                style={{ background: getPlanBg(userPlan), color: getPlanColor(userPlan) }}>
                 Plan {getPlanLabel(userPlan)}
               </span>
             </div>
@@ -261,9 +237,7 @@ export default function Profil() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-                    Email
-                  </label>
+                  <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">Email</label>
                   <input
                     value={user?.email || ''}
                     disabled
@@ -271,7 +245,6 @@ export default function Profil() {
                   />
                   <p className="text-xs text-[#64748B] mt-1">L'email ne peut pas être modifié</p>
                 </div>
-
                 <div>
                   <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
                     Devise de la boutique
@@ -285,9 +258,7 @@ export default function Profil() {
                         key={c.id}
                         onClick={() => setForm({ ...form, currency: c.id })}
                         className={`p-3 rounded-xl border-2 text-left transition-all ${
-                          form.currency === c.id
-                            ? 'border-[#1A56DB] bg-[#EBF2FF]'
-                            : 'border-gray-200 bg-white'
+                          form.currency === c.id ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
                         }`}
                       >
                         <p className="text-lg font-bold text-[#1A56DB]">{c.symbol}</p>
@@ -301,7 +272,6 @@ export default function Profil() {
                   </p>
                 </div>
               </div>
-
               <button
                 onClick={handleSaveProfile}
                 disabled={saving}
@@ -311,93 +281,19 @@ export default function Profil() {
               </button>
             </div>
 
-           <button
+            <button
               onClick={() => setShowLogoutConfirm(true)}
               className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm"
             >
               Se déconnecter
             </button>
 
-            {/* Bouton suppression compte */}
             <button
               onClick={() => setShowDeleteAccount(true)}
               className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm mt-3"
             >
               🗑️ Supprimer mon compte
             </button>
-
-            {/* Modal confirmation suppression */}
-            {showDeleteAccount && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                <div className="bg-white rounded-2xl w-full max-w-sm p-5">
-                  <div className="text-center mb-4">
-                    <p className="text-3xl mb-3">⚠️</p>
-                    <h2 className="text-base font-bold text-[#0F172A]">Supprimer mon compte ?</h2>
-                    <p className="text-sm text-[#64748B] mt-2 leading-relaxed">
-                      Toutes tes données seront supprimées définitivement — ventes, stocks, clients, dépenses.
-                    </p>
-                    <p className="text-xs text-[#64748B] mt-2">
-                      Tes informations de paiement seront conservées pour nos archives.
-                    </p>
-                    <div className="mt-4">
-                      <p className="text-xs font-semibold text-[#64748B] mb-2">
-                        Tape <span className="text-[#DC2626] font-bold">SUPPRIMER</span> pour confirmer
-                      </p>
-                      <input
-                        value={deleteConfirmText}
-                        onChange={(e) => setDeleteConfirmText(e.target.value)}
-                        placeholder="SUPPRIMER"
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#DC2626] text-center font-bold"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText('') }}
-                      className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      onClick={handleDeleteAccount}
-                      disabled={deleteConfirmText !== 'SUPPRIMER' || deletingAccount}
-                      className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
-                    >
-                      {deletingAccount ? 'Suppression...' : 'Supprimer'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Modal confirmation déconnexion */}
-            {showLogoutConfirm && (
-              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
-                <div className="bg-white rounded-2xl w-full max-w-sm p-5">
-                  <div className="text-center mb-4">
-                    <p className="text-3xl mb-3">👋</p>
-                    <h2 className="text-base font-bold text-[#0F172A]">Se déconnecter ?</h2>
-                    <p className="text-sm text-[#64748B] mt-1">
-                      Tu devras te reconnecter pour accéder à ton compte.
-                    </p>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => setShowLogoutConfirm(false)}
-                      className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm"
-                    >
-                      Se déconnecter
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
           </>
         )}
 
@@ -406,19 +302,16 @@ export default function Profil() {
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
               Changer le mot de passe
             </p>
-
             {passwordSuccess && (
               <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-[#16A34A] font-medium">{passwordSuccess}</p>
               </div>
             )}
-
             {passwordError && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-[#DC2626]">{passwordError}</p>
               </div>
             )}
-
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
@@ -445,7 +338,6 @@ export default function Profil() {
                 />
               </div>
             </div>
-
             <button
               onClick={handleChangePassword}
               disabled={saving}
@@ -458,17 +350,12 @@ export default function Profil() {
 
         {activeTab === 'abonnement' && (
           <>
-            {/* Plan actuel */}
-            <div
-              className="rounded-xl p-4 mb-4 border"
-              style={{ background: getPlanBg(userPlan), borderColor: getPlanColor(userPlan) + '40' }}
-            >
+            <div className="rounded-xl p-4 mb-4 border"
+              style={{ background: getPlanBg(userPlan), borderColor: getPlanColor(userPlan) + '40' }}>
               <div className="flex items-center justify-between mb-3">
                 <p className="text-sm font-bold text-[#0F172A]">Plan actuel</p>
-                <span
-                  className="text-xs font-bold px-3 py-1.5 rounded-lg text-white"
-                  style={{ background: getPlanColor(userPlan) }}
-                >
+                <span className="text-xs font-bold px-3 py-1.5 rounded-lg text-white"
+                  style={{ background: getPlanColor(userPlan) }}>
                   {getPlanLabel(userPlan).toUpperCase()}
                 </span>
               </div>
@@ -480,20 +367,16 @@ export default function Profil() {
               )}
             </div>
 
-            {/* Comparaison plans — Free vs Pro uniquement */}
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
               <div className="flex items-center mb-3">
-                <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide flex-1">
-                  Fonctionnalités
-                </p>
+                <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide flex-1">Fonctionnalités</p>
                 <div className="flex gap-3">
                   <p className="text-xs font-bold text-[#64748B] w-16 text-center">Gratuit</p>
                   <p className="text-xs font-bold text-[#16A34A] w-16 text-center">Pro</p>
                 </div>
               </div>
-
               {[
-                { feature: 'Ventes par jour', free: '5/jour', pro: 'Illimitées' },
+                { feature: 'Ventes par jour', free: '10/jour', pro: 'Illimitées' },
                 { feature: 'Produits', free: '5 max', pro: 'Illimités' },
                 { feature: 'Clients', free: '3 max', pro: 'Illimités' },
                 { feature: 'Rapports complets', free: false, pro: true },
@@ -503,23 +386,18 @@ export default function Profil() {
                   <p className="text-xs text-[#0F172A] flex-1">{f.feature}</p>
                   <div className="flex gap-3">
                     <span className={`text-xs w-16 text-center font-medium ${
-                      f.free === true ? 'text-[#16A34A]' :
-                      f.free === false ? 'text-gray-300' :
-                      'text-[#64748B]'
+                      f.free === true ? 'text-[#16A34A]' : f.free === false ? 'text-gray-300' : 'text-[#64748B]'
                     }`}>
                       {f.free === true ? '✓' : f.free === false ? '✗' : f.free}
                     </span>
                     <span className={`text-xs w-16 text-center font-medium ${
-                      f.pro === true ? 'text-[#16A34A]' :
-                      f.pro === false ? 'text-gray-300' :
-                      'text-[#16A34A]'
+                      f.pro === true ? 'text-[#16A34A]' : f.pro === false ? 'text-gray-300' : 'text-[#16A34A]'
                     }`}>
                       {f.pro === true ? '✓' : f.pro === false ? '✗' : f.pro}
                     </span>
                   </div>
                 </div>
               ))}
-
               <div className="flex items-center mt-3 pt-2 border-t border-gray-100">
                 <p className="text-xs font-semibold text-[#0F172A] flex-1">Prix/mois</p>
                 <div className="flex gap-3">
@@ -529,26 +407,20 @@ export default function Profil() {
               </div>
             </div>
 
-            {/* Bouton action */}
             {(userPlan === 'trial' || userPlan === 'free') && (
-              <button
-                onClick={() => navigate('/expired')}
-                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3"
-              >
+              <button onClick={() => navigate('/expired')}
+                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3">
                 Passer au Pro — 5$/mois
               </button>
             )}
 
             {userPlan === 'pro' && (
-              <button
-                onClick={() => navigate('/expired')}
-                className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-3"
-              >
+              <button onClick={() => navigate('/expired')}
+                className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-3">
                 Renouveler mon abonnement
               </button>
             )}
 
-            {/* Avantages Pro */}
             {(userPlan === 'trial' || userPlan === 'free') && (
               <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-4">
                 <p className="text-xs font-semibold text-[#16A34A] mb-2">✨ Pourquoi passer au Pro ?</p>
@@ -586,27 +458,20 @@ export default function Profil() {
                   <div className="flex items-center justify-between mb-2">
                     <div>
                       <p className="text-sm font-bold text-[#0F172A]">Plan Pro — {p.duration} mois</p>
-                      <p className="text-xs text-[#64748B]">
-                        {new Date(p.created_at).toLocaleDateString('fr-FR')}
-                      </p>
+                      <p className="text-xs text-[#64748B]">{new Date(p.created_at).toLocaleDateString('fr-FR')}</p>
                     </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                      p.status === 'completed' 
-                        ? 'bg-[#F0FDF4] text-[#16A34A]' 
-                        : p.status === 'pending'
-                        ? 'bg-[#FFFBEB] text-[#B45309]'
-                        : 'bg-[#FEF2F2] text-[#DC2626]'
-                    }`}>
-                      {p.status === 'completed' ? '✅ Payé' : p.status === 'pending' ? '⏳ En attente' : '❌ Échoué'}
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-[#F0FDF4] text-[#16A34A]">
+                      ✅ Payé
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-bold text-[#1A56DB]">
-                      {p.currency === 'USD' ? `$${p.amount}` : `${p.amount.toLocaleString('fr-FR')} FC`}
+                      {p.currency === 'USD'
+                        ? `$${DISPLAY_PRICES.USD[p.duration] || p.amount}`
+                        : `${(DISPLAY_PRICES.CDF[p.duration] || p.amount).toLocaleString('fr-FR')} FC`
+                      }
                     </p>
-                    <p className="text-xs text-[#64748B]">
-                      {p.duration} mois × {p.currency === 'USD' ? '5$' : '12 000 FC'}
-                    </p>
+                    <p className="text-xs text-[#64748B]">{p.duration} mois</p>
                   </div>
                 </div>
               ))
@@ -616,8 +481,79 @@ export default function Profil() {
 
       </div>
 
-      <Navbar />
+      {/* Modals — hors des blocs activeTab */}
+      {showDeleteAccount && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="text-center mb-4">
+              <p className="text-3xl mb-3">⚠️</p>
+              <h2 className="text-base font-bold text-[#0F172A]">Supprimer mon compte ?</h2>
+              <p className="text-sm text-[#64748B] mt-2 leading-relaxed">
+                Toutes tes données seront supprimées définitivement — ventes, stocks, clients, dépenses.
+              </p>
+              <p className="text-xs text-[#64748B] mt-2">
+                Tes informations de paiement seront conservées pour nos archives.
+              </p>
+              <div className="mt-4">
+                <p className="text-xs font-semibold text-[#64748B] mb-2">
+                  Tape <span className="text-[#DC2626] font-bold">SUPPRIMER</span> pour confirmer
+                </p>
+                <input
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="SUPPRIMER"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#DC2626] text-center font-bold"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDeleteAccount(false); setDeleteConfirmText('') }}
+                className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== 'SUPPRIMER' || deletingAccount}
+                className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm disabled:opacity-50"
+              >
+                {deletingAccount ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
+      {showLogoutConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5">
+            <div className="text-center mb-4">
+              <p className="text-3xl mb-3">👋</p>
+              <h2 className="text-base font-bold text-[#0F172A]">Se déconnecter ?</h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                Tu devras te reconnecter pour accéder à ton compte.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLogoutConfirm(false)}
+                className="flex-1 bg-white border border-gray-200 text-[#64748B] rounded-xl py-3 font-medium text-sm"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex-1 bg-[#DC2626] text-white rounded-xl py-3 font-semibold text-sm"
+              >
+                Se déconnecter
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <Navbar />
     </div>
   )
 }

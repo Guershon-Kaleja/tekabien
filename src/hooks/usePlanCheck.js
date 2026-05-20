@@ -28,7 +28,6 @@ export default function usePlanCheck() {
       const expires = new Date(data.plan_expires)
       const gracePeriod = new Date(expires.getTime() + 3 * 24 * 60 * 60 * 1000)
       if (new Date() > gracePeriod) {
-        
         await supabase
           .from('users')
           .update({ plan: 'free' })
@@ -36,6 +35,8 @@ export default function usePlanCheck() {
         return
       }
     }
+
+    // plan === 'free' → accès au dashboard avec limites ✅
   }
 
   useEffect(() => {
