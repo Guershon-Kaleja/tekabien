@@ -491,9 +491,6 @@ export default function Profil() {
               <p className="text-sm text-[#64748B] mt-2 leading-relaxed">
                 Toutes tes données seront supprimées définitivement — ventes, stocks, clients, dépenses.
               </p>
-              <p className="text-xs text-[#64748B] mt-2">
-                Tes informations de paiement seront conservées pour nos archives.
-              </p>
               <div className="mt-4">
                 <p className="text-xs font-semibold text-[#64748B] mb-2">
                   Tape <span className="text-[#DC2626] font-bold">SUPPRIMER</span> pour confirmer
