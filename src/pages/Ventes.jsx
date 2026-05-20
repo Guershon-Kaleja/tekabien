@@ -463,6 +463,23 @@ export default function Ventes() {
                         </span>
                       </p>
                     )}
+
+                    {/* Date de remboursement */}
+                    <div className="mt-3">
+                      <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
+                        Date de remboursement (optionnel)
+                      </label>
+                      <input
+                        type="date"
+                        value={creditDueDate}
+                        onChange={(e) => setCreditDueDate(e.target.value)}
+                        style={{ WebkitAppearance: 'none' }}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
+                      />
+                      <p className="text-xs text-[#64748B] mt-1">
+                        Une notification de rappel sera envoyée à cette date
+                      </p>
+                    </div>
                   </div>
                 )}
 
@@ -729,21 +746,6 @@ export default function Ventes() {
           </div>
         </div>
       )}
-      {payment === 'credit' && selectedClient && (
-        <div className="mb-4">
-          <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
-            Date de remboursement (optionnel)
-          </label>
-          <input
-            type="date"
-            value={creditDueDate}
-            onChange={(e) => setCreditDueDate(e.target.value)}
-            style={{ WebkitAppearance: 'none' }}
-            className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB] bg-white text-[#0F172A]"
-          />
-        </div>
-      )}
-
       <Navbar />
     </div>
   )
