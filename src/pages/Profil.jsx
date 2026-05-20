@@ -174,11 +174,14 @@ export default function Profil() {
           <button
             key={t.id}
             onClick={() => setActiveTab(t.id)}
-            className={`flex-1 py-3 text-xs font-semibold transition-colors ${
-              activeTab === t.id ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]' : 'text-[#64748B]'
+            className={`flex-1 py-2 px-0 text-[9px] font-semibold transition-colors text-center ${
+              activeTab === t.id
+                ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'
+                : 'text-[#64748B]'
             }`}
           >
-            {t.label}
+            <span className="block text-base">{t.id === 'profil' ? '👤' : t.id === 'securite' ? '🔒' : t.id === 'abonnement' ? '💳' : '📋'}</span>
+            <span className="block">{t.id === 'profil' ? 'Profil' : t.id === 'securite' ? 'Sécurité' : t.id === 'abonnement' ? 'Abo.' : 'Paiements'}</span>
           </button>
         ))}
       </div>
