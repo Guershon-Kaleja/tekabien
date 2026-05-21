@@ -26,6 +26,7 @@ export default function Profil() {
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const {setCurrency: setContextCurrency } = useContext(UserContext)
 
   const DISPLAY_PRICES = {
     USD: { 1: 5, 3: 13.50, 6: 25.50, 12: 48 },
@@ -86,10 +87,9 @@ export default function Profil() {
       })
       .eq('id', userId)
 
-    if (error) {
-      setError('Erreur lors de la sauvegarde — réessaie')
-    } else {
+    if (!error) {
       setSuccess('Profil mis à jour avec succès ✅')
+      setContextCurrency(form.currency) 
       setTimeout(() => setSuccess(''), 3000)
     }
     setSaving(false)

@@ -10,6 +10,7 @@ export function UserProvider({ children }) {
   const [shopName, setShopName] = useState('')
   const [userId, setUserId] = useState(null)
   const [role, setRole] = useState(null)
+  const [currency, setCurrency] = useState('FC')
 
   useEffect(() => {
     const loadUser = async () => {
@@ -42,7 +43,7 @@ export function UserProvider({ children }) {
   }, [])
 
   return (
-    <UserContext.Provider value={{ userPlan, planExpires, currency, shopName, userId, role, setUserPlan, setPlanExpires }}>
+    <UserContext.Provider value={{ userPlan, planExpires, currency, setCurrency, shopName, userId, role, setUserPlan, setPlanExpires }}>
       {children}
     </UserContext.Provider>
   )
