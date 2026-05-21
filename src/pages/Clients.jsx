@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
@@ -6,15 +6,16 @@ import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
+import { UserContext } from '../context/UserContext'
 
 export default function Clients() {
   usePlanCheck()
+  const { userPlan } = useContext(UserContext)
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('tous')
   const [userId, setUserId] = useState(null)
-  const [userPlan, setUserPlan] = useState('free')
 
   const [showForm, setShowForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -46,15 +47,12 @@ export default function Clients() {
     if (!user) return
     setUserId(user.id)
 
-    const [
-      { data: userData },
-      { data: clientsData },
-    ] = await Promise.all([
-      supabase.from('users').select('plan').eq('id', user.id).single(),
-      supabase.from('customers').select('*').eq('user_id', user.id).order('name'),
-    ])
+    const { data: clientsData } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name')
 
-    if (userData) setUserPlan(userData.plan)
     if (clientsData) setClients(clientsData)
     setLoading(false)
   }

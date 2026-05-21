@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
+import { UserContext } from '../context/UserContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   usePlanCheck()
+  const { userPlan, planExpires, shopName: contextShopName } = useContext(UserContext)
   const [shopName, setShopName] = useState('')
   const [todaySales, setTodaySales] = useState(0)
   const [salesCount, setSalesCount] = useState(0)
@@ -18,14 +20,27 @@ export default function Dashboard() {
   const [lastSales, setLastSales] = useState([])
   const [loading, setLoading] = useState(true)
   const [trialDaysLeft, setTrialDaysLeft] = useState(null)
-  const [userPlan, setUserPlan] = useState(null)
-  const [planExpires, setPlanExpires] = useState(null)
   const [creditPending, setCreditPending] = useState(0)
 
   const today = new Date()
   const dateStr = today.toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
   })
+
+  useEffect(() => {
+    if (contextShopName) setShopName(contextShopName)
+  }, [contextShopName])
+
+  useEffect(() => {
+    if (userPlan && planExpires) {
+      const expires = new Date(planExpires)
+      const now = new Date()
+      const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
+      if (userPlan === 'trial' || daysLeft <= 3) {
+        setTrialDaysLeft(daysLeft > 0 ? daysLeft : 0)
+      }
+    }
+  }, [userPlan, planExpires])
 
   useEffect(() => { fetchData() }, [])
 
@@ -37,33 +52,16 @@ export default function Dashboard() {
     startOfDay.setHours(0, 0, 0, 0)
 
     const [
-      { data: userData },
       { data: salesData },
       { data: expensesData },
       { data: customersData },
       { data: productsData },
     ] = await Promise.all([
-      supabase.from('users').select('shop_name, plan, plan_expires').eq('id', user.id).single(),
       supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }),
       supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
       supabase.from('customers').select('total_debt').eq('user_id', user.id).gt('total_debt', 0),
       supabase.from('products').select('*').eq('user_id', user.id),
     ])
-
-    if (userData) {
-      setShopName(userData.shop_name)
-      setUserPlan(userData.plan)
-      setPlanExpires(userData.plan_expires)
-
-      if ((userData.plan === 'trial' || userData.plan === 'pro') && userData.plan_expires) {
-        const expires = new Date(userData.plan_expires)
-        const now = new Date()
-        const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24))
-        if (userData.plan === 'trial' || daysLeft <= 3) {
-          setTrialDaysLeft(daysLeft > 0 ? daysLeft : 0)
-        }
-      }
-    }
 
     if (salesData) {
       const encaissees = salesData.filter(s => s.encaissee !== false)

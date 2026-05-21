@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -7,11 +7,12 @@ import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import jsPDF from 'jspdf'
-
+import { UserContext } from '../context/UserContext'
 
 export default function Rapports() {
   const navigate = useNavigate()
   usePlanCheck()
+  const { userPlan, shopName: contextShopName } = useContext(UserContext)
   const [period, setPeriod] = useState('today')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -19,7 +20,6 @@ export default function Rapports() {
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
   const [shopName, setShopName] = useState('')
-  const [userPlan, setUserPlan] = useState(null)
   const [stats, setStats] = useState({
     totalSales: 0,
     totalCost: 0,
@@ -74,19 +74,14 @@ export default function Rapports() {
     const { start, end } = getDateRange()
 
     const [
-      { data: userData },
       { data: salesData },
       { data: expensesData },
     ] = await Promise.all([
-      supabase.from('users').select('shop_name, plan').eq('id', user.id).single(),
       supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
       supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', start).lte('created_at', end),
     ])
 
-    if (userData) {
-      setShopName(userData.shop_name)
-      setUserPlan(userData.plan)
-    }
+    if (!shopName) setShopName(contextShopName)
 
     if (salesData && expensesData) {
       const encaissees = salesData.filter(s => s.encaissee !== false)

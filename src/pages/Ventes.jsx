@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
@@ -7,11 +7,13 @@ import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
+import { UserContext } from '../context/UserContext'
 
 export default function Ventes() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   usePlanCheck()
+  const { userPlan } = useContext(UserContext)
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'history' ? 'history' : 'new'
   )
@@ -28,7 +30,6 @@ export default function Ventes() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [userId, setUserId] = useState(null)
-  const [userPlan, setUserPlan] = useState('free')
   const [todaySalesCount, setTodaySalesCount] = useState(0)
   const [error, setError] = useState('')
   const [allSales, setAllSales] = useState([])
@@ -62,18 +63,15 @@ export default function Ventes() {
     startOfDay.setHours(0, 0, 0, 0)
 
     const [
-      { data: userData },
       { data: productsData },
       { data: clientsData },
       { data: salesData },
     ] = await Promise.all([
-      supabase.from('users').select('plan').eq('id', user.id).single(),
       supabase.from('products').select('*').eq('user_id', user.id).order('name'),
       supabase.from('customers').select('*').eq('user_id', user.id).order('name'),
       supabase.from('sales').select('id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
     ])
 
-    if (userData) setUserPlan(userData.plan)
     if (productsData) setProducts(productsData)
     if (clientsData) setClients(clientsData)
     if (salesData) setTodaySalesCount(salesData.length)
