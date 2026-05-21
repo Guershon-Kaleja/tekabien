@@ -12,7 +12,7 @@ import { UserContext } from '../context/UserContext'
 export default function Rapports() {
   const navigate = useNavigate()
   usePlanCheck()
-  const { userPlan, shopName: contextShopName } = useContext(UserContext)
+  const { userPlan, shopName: contextShopName, userId: contextUserId } = useContext(UserContext)
   const [period, setPeriod] = useState('today')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -67,9 +67,8 @@ export default function Rapports() {
   }
 
   const fetchStats = async () => {
+    if (!contextUserId) return
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
 
     const { start, end } = getDateRange()
 
@@ -77,8 +76,8 @@ export default function Rapports() {
       { data: salesData },
       { data: expensesData },
     ] = await Promise.all([
-      supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
-      supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', start).lte('created_at', end),
+      supabase.from('sales').select('*').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
+      supabase.from('expenses').select('amount').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end),
     ])
 
     if (!shopName) setShopName(contextShopName)

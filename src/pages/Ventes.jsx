@@ -13,7 +13,7 @@ export default function Ventes() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   usePlanCheck()
-  const { userPlan } = useContext(UserContext)
+   const { userPlan, userId: contextUserId } = useContext(UserContext)
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'history' ? 'history' : 'new'
   )
@@ -29,7 +29,6 @@ export default function Ventes() {
   const [showClientPicker, setShowClientPicker] = useState(false)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [userId, setUserId] = useState(null)
   const [todaySalesCount, setTodaySalesCount] = useState(0)
   const [error, setError] = useState('')
   const [allSales, setAllSales] = useState([])
@@ -41,6 +40,7 @@ export default function Ventes() {
   const [showCancelConfirm, setShowCancelConfirm] = useState(null)
   const [creditDueDate, setCreditDueDate] = useState('')
   const [cancelling, setCancelling] = useState(false)
+  
 
   const { formatAmount } = useCurrency()
 
@@ -55,9 +55,7 @@ export default function Ventes() {
   })[method] || '#64748B'
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
+    if (!contextUserId) return
 
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
@@ -67,9 +65,9 @@ export default function Ventes() {
       { data: clientsData },
       { data: salesData },
     ] = await Promise.all([
-      supabase.from('products').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('customers').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('sales').select('id').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
+      supabase.from('products').select('*').eq('user_id', contextUserId).order('name'),
+      supabase.from('customers').select('*').eq('user_id', contextUserId).order('name'),
+      supabase.from('sales').select('id').eq('user_id', contextUserId).gte('created_at', startOfDay.toISOString()),
     ])
 
     if (productsData) setProducts(productsData)
@@ -78,9 +76,8 @@ export default function Ventes() {
   }
 
   const fetchAllSales = async () => {
+    if (!contextUserId) { setSalesLoading(false); return }
     setSalesLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSalesLoading(false); return }
 
     const start = new Date()
     const end = new Date()
@@ -96,7 +93,7 @@ export default function Ventes() {
     }
 
     let query = supabase
-      .from('sales').select('*').eq('user_id', user.id)
+      .from('sales').select('*').eq('user_id', contextUserId)
       .order('created_at', { ascending: false }).limit(100)
 
     if (historyFilter === 'custom' && historyCustomStart) {
@@ -115,7 +112,9 @@ export default function Ventes() {
     setSalesLoading(false)
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    if (contextUserId) fetchData()
+  }, [contextUserId])
 
   useEffect(() => {
     if (activeTab === 'history' && historyFilter !== 'custom') fetchAllSales()
@@ -159,7 +158,7 @@ export default function Ventes() {
     setLoading(true)
 
     const saleData = {
-      user_id: userId,
+      user_id: contextUserId,
       product_id: selected.id,
       product_name: sanitize(selected.name),
       quantity, total,
@@ -177,7 +176,7 @@ export default function Ventes() {
 
       if (payment === 'credit' && selectedClient) {
         await supabase.from('debts').insert({
-          user_id: userId,
+          user_id: contextUserId,
           customer_id: selectedClient.id,
           amount: total,
           paid: 0,

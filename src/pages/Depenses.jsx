@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../lib/supabase'
 import { validateExpense, sanitize } from '../lib/validation'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
+import { UserContext } from '../context/UserContext'
 
 export default function Depenses() {
   usePlanCheck()
+  const { userId } = useContext(UserContext)
   const [expenses, setExpenses] = useState([])
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
-  const [userId, setUserId] = useState(null)
   const [period, setPeriod] = useState('today')
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ category: 'marchandises', amount: '', note: '' })
@@ -39,7 +40,9 @@ export default function Depenses() {
     { id: 'autre', label: 'Autre', icon: '📌' },
   ]
 
-  useEffect(() => { fetchData() }, [period])
+  useEffect(() => {
+    if (userId) fetchData()
+  }, [period, userId])
 
   const getDateRange = () => {
     const now = new Date()
@@ -57,9 +60,7 @@ export default function Depenses() {
   }
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
+    if (!userId) return
 
     const { start, end } = getDateRange()
 
@@ -67,8 +68,8 @@ export default function Depenses() {
       { data: expData },
       { data: salesData },
     ] = await Promise.all([
-      supabase.from('expenses').select('*').eq('user_id', user.id).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false }),
-      supabase.from('sales').select('total, cost, encaissee').eq('user_id', user.id).gte('created_at', start).lte('created_at', end),
+      supabase.from('expenses').select('*').eq('user_id', userId).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: false }),
+      supabase.from('sales').select('total, cost, encaissee').eq('user_id', userId).gte('created_at', start).lte('created_at', end),
     ])
 
     if (expData) setExpenses(expData)

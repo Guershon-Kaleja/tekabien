@@ -1,22 +1,8 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useContext } from 'react'
+import { UserContext } from '../context/UserContext'
 
 export default function useCurrency() {
-  const [currency, setCurrency] = useState('FC')
-
-  useEffect(() => {
-    const fetchCurrency = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      const { data } = await supabase
-        .from('users')
-        .select('currency')
-        .eq('id', user.id)
-        .single()
-      if (data?.currency) setCurrency(data.currency)
-    }
-    fetchCurrency()
-  }, [])
+  const { currency } = useContext(UserContext)
 
   const formatAmount = (amount) => {
     if (currency === 'USD') {

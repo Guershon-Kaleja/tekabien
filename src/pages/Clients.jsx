@@ -10,12 +10,11 @@ import { UserContext } from '../context/UserContext'
 
 export default function Clients() {
   usePlanCheck()
-  const { userPlan } = useContext(UserContext)
+  const { userPlan, userId: contextUserId } = useContext(UserContext)
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('tous')
-  const [userId, setUserId] = useState(null)
 
   const [showForm, setShowForm] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
@@ -40,17 +39,17 @@ export default function Clients() {
 
   const { formatAmount, currency } = useCurrency()
 
-  useEffect(() => { fetchClients() }, [])
+ useEffect(() => {
+    if (contextUserId) fetchClients()
+  }, [contextUserId])
 
   const fetchClients = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
+    if (!contextUserId) return
 
     const { data: clientsData } = await supabase
       .from('customers')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', contextUserId)
       .order('name')
 
     if (clientsData) setClients(clientsData)
@@ -78,7 +77,7 @@ export default function Clients() {
     setFormErrors({})
 
     const { error } = await supabase.from('customers').insert({
-      user_id: userId,
+      user_id: contextUserId,
       name: sanitize(form.name.trim()),
       total_debt: 0,
       total_paid: 0,
@@ -139,7 +138,7 @@ export default function Clients() {
     const amount = parseFloat(debtForm.amount)
 
     const { error } = await supabase.from('debts').insert({
-      user_id: userId,
+      user_id: contextUserId,
       customer_id: selectedClient.id,
       amount, paid: 0, status: 'pending',
       note: sanitize(debtForm.note),
@@ -182,7 +181,7 @@ export default function Clients() {
     const newPaid = (selectedClient.total_paid || 0) + amount
 
     await supabase.from('debt_payments').insert({
-      user_id: userId,
+      user_id: contextUserId,
       customer_id: selectedClient.id,
       amount,
       note: sanitize(payForm.note) || 'Remboursement partiel',
@@ -212,7 +211,7 @@ export default function Clients() {
 
   const handleFullPay = async (client) => {
     await supabase.from('debt_payments').insert({
-      user_id: userId,
+      user_id: contextUserId,
       customer_id: client.id,
       amount: client.total_debt,
       note: 'Remboursement total',

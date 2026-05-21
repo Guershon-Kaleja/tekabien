@@ -10,12 +10,11 @@ import { UserContext } from '../context/UserContext'
 
 export default function Stocks() {
   usePlanCheck()
-  const { userPlan } = useContext(UserContext)
+  const { userPlan, userId: contextUserId } = useContext(UserContext)
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('tous')
-  const [userId, setUserId] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [form, setForm] = useState({
@@ -32,17 +31,17 @@ export default function Stocks() {
 
   const { formatAmount, currency } = useCurrency()
 
-  useEffect(() => { fetchProducts() }, [])
+  useEffect(() => {
+    if (contextUserId) fetchProducts()
+  }, [contextUserId])
 
   const fetchProducts = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    setUserId(user.id)
+    if (!contextUserId) return
 
     const { data: productsData } = await supabase
       .from('products')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('user_id', contextUserId)
       .order('name')
 
     if (productsData) setProducts(productsData)
@@ -65,7 +64,7 @@ export default function Stocks() {
     setFormErrors({})
 
     const { error } = await supabase.from('products').insert({
-      user_id: userId,
+      user_id: contextUserId,
       name: sanitize(form.name),
       price_sell: parseFloat(form.price_sell),
       price_buy: parseFloat(form.price_buy) || 0,

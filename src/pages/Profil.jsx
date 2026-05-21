@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
+import { UserContext } from '../context/UserContext'
 
 export default function Profil() {
   const navigate = useNavigate()
+  const { userId } = useContext(UserContext)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState(null)
@@ -30,22 +32,23 @@ export default function Profil() {
     CDF: { 1: 12000, 3: 32400, 6: 61200, 12: 115200 },
   }
 
-  useEffect(() => { fetchProfile() }, [])
+  useEffect(() => {
+    if (userId) fetchProfile()
+  }, [userId])
 
   const fetchProfile = async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) return
-    setUser(authUser)
+    if (!userId) return
 
     const [
       { data },
       { data: paymentsData },
     ] = await Promise.all([
-      supabase.from('users').select('shop_name, phone, plan, plan_expires, currency').eq('id', authUser.id).single(),
-      supabase.from('payments').select('*').eq('user_id', authUser.id).eq('status', 'completed').order('created_at', { ascending: false }),
+      supabase.from('users').select('shop_name, phone, plan, plan_expires, currency, email').eq('id', userId).single(),
+      supabase.from('payments').select('*').eq('user_id', userId).eq('status', 'completed').order('created_at', { ascending: false }),
     ])
 
     if (data) {
+      setUser({ email: data.email })
       setForm({
         shop_name: data.shop_name || '',
         phone: data.phone || '',
@@ -81,7 +84,7 @@ export default function Profil() {
         phone: sanitize(form.phone),
         currency: form.currency,
       })
-      .eq('id', user.id)
+      .eq('id', userId)
 
     if (error) {
       setError('Erreur lors de la sauvegarde — réessaie')
@@ -121,15 +124,15 @@ export default function Profil() {
     setDeletingAccount(true)
 
     try {
-      await supabase.from('sales').delete().eq('user_id', user.id)
-      await supabase.from('products').delete().eq('user_id', user.id)
-      await supabase.from('debt_payments').delete().eq('user_id', user.id)
-      await supabase.from('debts').delete().eq('user_id', user.id)
-      await supabase.from('customers').delete().eq('user_id', user.id)
-      await supabase.from('expenses').delete().eq('user_id', user.id)
-      await supabase.from('payments').update({ user_id: null }).eq('user_id', user.id)
-      await supabase.from('users').delete().eq('id', user.id)
-      await supabase.auth.signOut()
+      await supabase.from('sales').delete().eq('user_id', userId)
+      await supabase.from('products').delete().eq('user_id', userId)
+      await supabase.from('debt_payments').delete().eq('user_id', userId)
+      await supabase.from('debts').delete().eq('user_id', userId)
+      await supabase.from('customers').delete().eq('user_id', userId)
+      await supabase.from('expenses').delete().eq('user_id', userId)
+      await supabase.from('payments').update({ user_id: null }).eq('user_id', userId)
+      await supabase.from('users').delete().eq('id', userId)
+      await supabase.auth.signOut() // ← ajoute cette ligne
       navigate('/login')
     } catch {
       setDeletingAccount(false)

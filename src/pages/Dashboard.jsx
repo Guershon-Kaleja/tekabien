@@ -9,7 +9,7 @@ import { UserContext } from '../context/UserContext'
 export default function Dashboard() {
   const navigate = useNavigate()
   usePlanCheck()
-  const { userPlan, planExpires, shopName: contextShopName } = useContext(UserContext)
+  const { userPlan, planExpires, shopName: contextShopName, userId } = useContext(UserContext)
   const [shopName, setShopName] = useState('')
   const [todaySales, setTodaySales] = useState(0)
   const [salesCount, setSalesCount] = useState(0)
@@ -42,11 +42,13 @@ export default function Dashboard() {
     }
   }, [userPlan, planExpires])
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    if (userId) fetchData()
+  }, [userId])
+
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!userId) return
 
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
@@ -57,10 +59,10 @@ export default function Dashboard() {
       { data: customersData },
       { data: productsData },
     ] = await Promise.all([
-      supabase.from('sales').select('*').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }),
-      supabase.from('expenses').select('amount').eq('user_id', user.id).gte('created_at', startOfDay.toISOString()),
-      supabase.from('customers').select('total_debt').eq('user_id', user.id).gt('total_debt', 0),
-      supabase.from('products').select('*').eq('user_id', user.id),
+      supabase.from('sales').select('*').eq('user_id', userId).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }),
+      supabase.from('expenses').select('amount').eq('user_id', userId).gte('created_at', startOfDay.toISOString()),
+      supabase.from('customers').select('total_debt').eq('user_id', userId).gt('total_debt', 0),
+      supabase.from('products').select('*').eq('user_id', userId),
     ])
 
     if (salesData) {
