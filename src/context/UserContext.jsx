@@ -10,7 +10,6 @@ export function UserProvider({ children }) {
   const [shopName, setShopName] = useState('')
   const [userId, setUserId] = useState(null)
   const [role, setRole] = useState(null)
-  const [currency, setCurrency] = useState('FC')
 
   useEffect(() => {
     const loadUser = async () => {
