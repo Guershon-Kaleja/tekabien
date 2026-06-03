@@ -63,7 +63,8 @@ export default function Stocks() {
     }
     setFormErrors({})
 
-    const { error } = await supabase.from('products').insert({
+    const tempProduct = {
+      id: `temp-${Date.now()}`,
       user_id: contextUserId,
       name: sanitize(form.name),
       price_sell: parseFloat(form.price_sell),
@@ -71,12 +72,26 @@ export default function Stocks() {
       quantity: parseInt(form.quantity),
       alert_threshold: parseInt(form.alert_threshold) || 5,
       category: sanitize(form.category),
+    }
+    setProducts(prev => [...prev, tempProduct].sort((a, b) => a.name.localeCompare(b.name)))
+    setShowForm(false)
+    setForm({ name: '', price_sell: '', price_buy: '', quantity: '', alert_threshold: '5', category: 'alimentation' })
+
+    const { error } = await supabase.from('products').insert({
+      user_id: contextUserId,
+      name: tempProduct.name,
+      price_sell: tempProduct.price_sell,
+      price_buy: tempProduct.price_buy,
+      quantity: tempProduct.quantity,
+      alert_threshold: tempProduct.alert_threshold,
+      category: tempProduct.category,
     })
 
-    if (!error) {
-      setShowForm(false)
-      setForm({ name: '', price_sell: '', price_buy: '', quantity: '', alert_threshold: '5', category: 'alimentation' })
-      fetchProducts()
+    if (error) {
+      setProducts(prev => prev.filter(p => p.id !== tempProduct.id))
+      setShowForm(true)
+    } else {
+      fetchProducts() 
     }
   }
 
@@ -88,33 +103,47 @@ export default function Stocks() {
     }
     setEditErrors({})
 
+    const updatedProduct = {
+      ...editProduct,
+      name: sanitize(editForm.name),
+      price_sell: parseFloat(editForm.price_sell),
+      price_buy: parseFloat(editForm.price_buy) || 0,
+      quantity: parseInt(editForm.quantity),
+      alert_threshold: parseInt(editForm.alert_threshold) || 5,
+      category: sanitize(editForm.category),
+    }
+
+    setProducts(prev => prev.map(p => p.id === editProduct.id ? updatedProduct : p))
+    setEditProduct(null)
+
     const { error } = await supabase
       .from('products')
       .update({
-        name: sanitize(editForm.name),
-        price_sell: parseFloat(editForm.price_sell),
-        price_buy: parseFloat(editForm.price_buy) || 0,
-        quantity: parseInt(editForm.quantity),
-        alert_threshold: parseInt(editForm.alert_threshold) || 5,
-        category: sanitize(editForm.category),
+        name: updatedProduct.name,
+        price_sell: updatedProduct.price_sell,
+        price_buy: updatedProduct.price_buy,
+        quantity: updatedProduct.quantity,
+        alert_threshold: updatedProduct.alert_threshold,
+        category: updatedProduct.category,
       })
       .eq('id', editProduct.id)
 
-    if (!error) {
-      setEditProduct(null)
-      fetchProducts()
+    if (error) {
+      setProducts(prev => prev.map(p => p.id === editProduct.id ? editProduct : p))
     }
   }
 
   const handleDelete = async (product) => {
+    setProducts(prev => prev.filter(p => p.id !== product.id))
+    setShowDeleteConfirm(null)
+
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', product.id)
 
-    if (!error) {
-      setShowDeleteConfirm(null)
-      fetchProducts()
+    if (error) {
+      setProducts(prev => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)))
     }
   }
 
@@ -126,15 +155,19 @@ export default function Stocks() {
     }
     setRestockError('')
 
+    const newQty = restock.quantity + qty
+
+    setProducts(prev => prev.map(p => p.id === restock.id ? { ...p, quantity: newQty } : p))
+    setRestock(null)
+    setRestockQty('')
+
     const { error } = await supabase
       .from('products')
-      .update({ quantity: restock.quantity + qty })
+      .update({ quantity: newQty })
       .eq('id', restock.id)
 
-    if (!error) {
-      setRestock(null)
-      setRestockQty('')
-      fetchProducts()
+    if (error) {
+      setProducts(prev => prev.map(p => p.id === restock.id ? { ...p, quantity: restock.quantity } : p))
     }
   }
 
