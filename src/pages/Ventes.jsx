@@ -209,6 +209,10 @@ export default function Ventes() {
 
   const handleCancelSale = async (sale) => {
     setCancelling(true)
+
+    setAllSales(prev => prev.filter(s => s.id !== sale.id))
+    setShowCancelConfirm(null)
+
     try {
       const { error } = await supabase.from('sales').delete().eq('id', sale.id)
       if (!error) {
@@ -229,12 +233,13 @@ export default function Ventes() {
               .eq('id', sale.customer_id)
           }
         }
-        setShowCancelConfirm(null)
-        fetchAllSales()
+      } else {
+        setAllSales(prev => [sale, ...prev])
       }
-    } catch (err) {
-      console.error('Erreur annulation:', err)
+    } catch {
+      setAllSales(prev => [sale, ...prev])
     }
+
     setCancelling(false)
   }
 
