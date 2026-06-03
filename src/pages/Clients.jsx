@@ -66,172 +66,131 @@ export default function Clients() {
   }
 
   const handleAddClient = async () => {
-    if (!canAddClient(userPlan, clients.length)) {
-      setFormErrors({ name: `Limite atteinte — ${getPlanLimits(userPlan).maxClients} clients max. Passe au Pro.` })
-      return
-    }
-    if (!form.name || form.name.trim().length < 2) {
-      setFormErrors({ name: 'Entre le nom du client' })
-      return
-    }
-    setFormErrors({})
+  if (!canAddClient(userPlan, clients.length)) {
+    setFormErrors({ name: `Limite atteinte — ${getPlanLimits(userPlan).maxClients} clients max. Passe au Pro.` })
+    return
+  }
+  if (!form.name || form.name.trim().length < 2) {
+    setFormErrors({ name: 'Entre le nom du client' })
+    return
+  }
+  setFormErrors({})
 
-    const { error } = await supabase.from('customers').insert({
-      user_id: contextUserId,
-      name: sanitize(form.name.trim()),
-      total_debt: 0,
-      total_paid: 0,
-    })
-    if (!error) {
-      setShowForm(false)
-      setForm({ name: '' })
-      fetchClients()
-    }
+  const tempClient = {
+    id: `temp-${Date.now()}`,
+    user_id: contextUserId,
+    name: sanitize(form.name.trim()),
+    total_debt: 0,
+    total_paid: 0,
   }
 
-  const handleEditClient = async () => {
-    if (!editForm.name || editForm.name.trim().length < 2) {
-      setEditErrors({ name: 'Entre le nom du client' })
-      return
-    }
-    setEditErrors({})
+  setClients(prev => [...prev, tempClient].sort((a, b) => a.name.localeCompare(b.name)))
+  setShowForm(false)
+  setForm({ name: '' })
 
-    const { error } = await supabase
-      .from('customers')
-      .update({ name: sanitize(editForm.name.trim()) })
-      .eq('id', selectedClient.id)
+  const { error } = await supabase.from('customers').insert({
+    user_id: contextUserId,
+    name: tempClient.name,
+    total_debt: 0,
+    total_paid: 0,
+  })
 
-    if (!error) {
-      setShowEditForm(false)
-      setSelectedClient(null)
-      fetchClients()
-    }
-  }
-
- const handleDeleteClient = async (client) => {
-    // Ordre important — respecter les foreign keys
-    await supabase.from('sales')
-      .update({ customer_id: null, customer_name: null })
-      .eq('customer_id', client.id)
-
-    await supabase.from('debt_payments')
-      .delete()
-      .eq('customer_id', client.id)
-
-    await supabase.from('debts')
-      .delete()
-      .eq('customer_id', client.id)
-
-    await supabase.from('customers')
-      .delete()
-      .eq('id', client.id)
-
-    setShowDeleteClient(null)
+  if (error) {
+    setClients(prev => prev.filter(c => c.id !== tempClient.id))
+    setShowForm(true)
+  } else {
     fetchClients()
   }
+}
 
-  const handleAddDebt = async () => {
-    if (!debtForm.amount || parseFloat(debtForm.amount) <= 0) {
-      setDebtErrors({ amount: 'Le montant doit être supérieur à 0' }); return
-    }
-    setDebtErrors({})
-    const amount = parseFloat(debtForm.amount)
-
-    const { error } = await supabase.from('debts').insert({
-      user_id: contextUserId,
-      customer_id: selectedClient.id,
-      amount, paid: 0, status: 'pending',
-      note: sanitize(debtForm.note),
-      due_date: debtForm.due_date || null,
-    })
-    if (!error) {
-      await supabase.from('customers')
-        .update({ total_debt: selectedClient.total_debt + amount })
-        .eq('id', selectedClient.id)
-      setShowDebtForm(false)
-      setDebtForm({ amount: '', note: '' })
-      fetchClients()
-    }
+const handleEditClient = async () => {
+  if (!editForm.name || editForm.name.trim().length < 2) {
+    setEditErrors({ name: 'Entre le nom du client' })
+    return
   }
+  setEditErrors({})
 
-  const handleEditDebt = async () => {
-    if (!editDebtAmount || parseFloat(editDebtAmount) < 0) return
-    const newAmount = parseFloat(editDebtAmount)
+  const oldName = selectedClient.name
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: sanitize(editForm.name.trim()) } : c))
+  setShowEditForm(false)
+  setSelectedClient(null)
 
-    await supabase.from('customers')
-      .update({ total_debt: newAmount })
-      .eq('id', selectedClient.id)
+  const { error } = await supabase
+    .from('customers')
+    .update({ name: sanitize(editForm.name.trim()) })
+    .eq('id', selectedClient.id)
 
-    setShowEditDebt(false)
-    setEditDebtAmount('')
-    fetchClients()
+  if (error) {
+    setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: oldName } : c))
   }
+}
 
-  const handlePartialPay = async () => {
-    const amount = parseFloat(payForm.amount)
-    if (!amount || amount <= 0) {
-      setPayErrors({ amount: 'Le montant doit être supérieur à 0' }); return
-    }
-    if (amount > selectedClient.total_debt) {
-      setPayErrors({ amount: `Le montant ne peut pas dépasser la dette (${formatAmount(selectedClient.total_debt)})` }); return
-    }
-    setPayErrors({})
+const handleDeleteClient = async (client) => {
+  setClients(prev => prev.filter(c => c.id !== client.id))
+  setShowDeleteClient(null)
 
-    const newDebt = selectedClient.total_debt - amount
-    const newPaid = (selectedClient.total_paid || 0) + amount
+  await supabase.from('sales').update({ customer_id: null, customer_name: null }).eq('customer_id', client.id)
+  await supabase.from('debt_payments').delete().eq('customer_id', client.id)
+  await supabase.from('debts').delete().eq('customer_id', client.id)
 
-    await supabase.from('debt_payments').insert({
-      user_id: contextUserId,
-      customer_id: selectedClient.id,
-      amount,
-      note: sanitize(payForm.note) || 'Remboursement partiel',
-    })
+  const { error } = await supabase.from('customers').delete().eq('id', client.id)
 
-    await supabase.from('customers')
-      .update({ total_debt: newDebt, total_paid: newPaid })
-      .eq('id', selectedClient.id)
-
-    if (newDebt === 0) {
-      await supabase.from('sales')
-        .update({ encaissee: true })
-        .eq('customer_id', selectedClient.id)
-        .eq('payment_method', 'credit')
-        .eq('encaissee', false)
-
-      await supabase.from('debts')
-        .update({ status: 'paid', paid: selectedClient.total_debt })
-        .eq('customer_id', selectedClient.id)
-        .eq('status', 'pending')
-    }
-
-    setShowPayForm(false)
-    setPayForm({ amount: '', note: '' })
-    fetchClients()
+  if (error) {
+    setClients(prev => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)))
   }
+}
 
-  const handleFullPay = async (client) => {
-    await supabase.from('debt_payments').insert({
-      user_id: contextUserId,
-      customer_id: client.id,
-      amount: client.total_debt,
-      note: 'Remboursement total',
-    })
-
-    await supabase.from('customers')
-      .update({ total_debt: 0, total_paid: (client.total_paid || 0) + client.total_debt })
-      .eq('id', client.id)
-
-    await supabase.from('debts')
-      .update({ status: 'paid', paid: client.total_debt })
-      .eq('customer_id', client.id).eq('status', 'pending')
-
-    await supabase.from('sales')
-      .update({ encaissee: true })
-      .eq('customer_id', client.id)
-      .eq('payment_method', 'credit').eq('encaissee', false)
-
-    fetchClients()
+const handlePartialPay = async () => {
+  const amount = parseFloat(payForm.amount)
+  if (!amount || amount <= 0) {
+    setPayErrors({ amount: 'Le montant doit être supérieur à 0' }); return
   }
+  if (amount > selectedClient.total_debt) {
+    setPayErrors({ amount: `Le montant ne peut pas dépasser la dette (${formatAmount(selectedClient.total_debt)})` }); return
+  }
+  setPayErrors({})
+
+  const newDebt = selectedClient.total_debt - amount
+  const newPaid = (selectedClient.total_paid || 0) + amount
+
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, total_debt: newDebt, total_paid: newPaid } : c))
+  setShowPayForm(false)
+  setPayForm({ amount: '', note: '' })
+
+  await supabase.from('debt_payments').insert({
+    user_id: contextUserId,
+    customer_id: selectedClient.id,
+    amount,
+    note: sanitize(payForm.note) || 'Remboursement partiel',
+  })
+
+  await supabase.from('customers')
+    .update({ total_debt: newDebt, total_paid: newPaid })
+    .eq('id', selectedClient.id)
+
+  if (newDebt === 0) {
+    await supabase.from('sales').update({ encaissee: true }).eq('customer_id', selectedClient.id).eq('payment_method', 'credit').eq('encaissee', false)
+    await supabase.from('debts').update({ status: 'paid', paid: selectedClient.total_debt }).eq('customer_id', selectedClient.id).eq('status', 'pending')
+  }
+}
+
+const handleFullPay = async (client) => {
+  setClients(prev => prev.map(c => c.id === client.id ? { ...c, total_debt: 0, total_paid: (c.total_paid || 0) + c.total_debt } : c))
+
+  await supabase.from('debt_payments').insert({
+    user_id: contextUserId,
+    customer_id: client.id,
+    amount: client.total_debt,
+    note: 'Remboursement total',
+  })
+
+  await supabase.from('customers')
+    .update({ total_debt: 0, total_paid: (client.total_paid || 0) + client.total_debt })
+    .eq('id', client.id)
+
+  await supabase.from('debts').update({ status: 'paid', paid: client.total_debt }).eq('customer_id', client.id).eq('status', 'pending')
+  await supabase.from('sales').update({ encaissee: true }).eq('customer_id', client.id).eq('payment_method', 'credit').eq('encaissee', false)
+}
 
   const formatDate = (dateStr) =>
     new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' }) +
