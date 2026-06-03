@@ -85,16 +85,30 @@ export default function Depenses() {
     }
     setFormErrors({})
 
-    const { error } = await supabase.from('expenses').insert({
+    const tempExpense = {
+      id: `temp-${Date.now()}`,
       user_id: userId,
       category: form.category,
       amount: parseFloat(form.amount),
       note: sanitize(form.note),
+      created_at: new Date().toISOString(),
+    }
+
+    setExpenses(prev => [tempExpense, ...prev])
+    setShowForm(false)
+    setForm({ category: 'marchandises', amount: '', note: '' })
+
+    const { error } = await supabase.from('expenses').insert({
+      user_id: userId,
+      category: tempExpense.category,
+      amount: tempExpense.amount,
+      note: tempExpense.note,
     })
 
-    if (!error) {
-      setShowForm(false)
-      setForm({ category: 'marchandises', amount: '', note: '' })
+    if (error) {
+      setExpenses(prev => prev.filter(e => e.id !== tempExpense.id))
+      setShowForm(true)
+    } else {
       fetchData()
     }
   }
@@ -107,30 +121,42 @@ export default function Depenses() {
     }
     setEditErrors({})
 
+    const oldExpense = editExpense
+    const updated = {
+      ...editExpense,
+      category: editForm.category,
+      amount: parseFloat(editForm.amount),
+      note: sanitize(editForm.note),
+    }
+
+    setExpenses(prev => prev.map(e => e.id === editExpense.id ? updated : e))
+    setEditExpense(null)
+
     const { error } = await supabase
       .from('expenses')
       .update({
-        category: editForm.category,
-        amount: parseFloat(editForm.amount),
-        note: sanitize(editForm.note),
+        category: updated.category,
+        amount: updated.amount,
+        note: updated.note,
       })
       .eq('id', editExpense.id)
 
-    if (!error) {
-      setEditExpense(null)
-      fetchData()
+    if (error) {
+      setExpenses(prev => prev.map(e => e.id === oldExpense.id ? oldExpense : e))
     }
   }
 
   const handleDelete = async (expense) => {
+    setExpenses(prev => prev.filter(e => e.id !== expense.id))
+    setShowDeleteConfirm(null)
+
     const { error } = await supabase
       .from('expenses')
       .delete()
       .eq('id', expense.id)
 
-    if (!error) {
-      setShowDeleteConfirm(null)
-      fetchData()
+    if (error) {
+      setExpenses(prev => [expense, ...prev])
     }
   }
 
