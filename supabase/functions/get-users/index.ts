@@ -70,7 +70,8 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
+    console.error('get-users error:', String(error))
+    return new Response(JSON.stringify({ error: 'Erreur interne du serveur' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })

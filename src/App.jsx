@@ -117,7 +117,7 @@ function App() {
         }>
           <Routes>
             <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-            <Route path="/onboarding" element={<Onboarding />} />
+            <Route path="/onboarding" element={session ? <Onboarding /> : <Navigate to="/login" />} />
             <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
             <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />

@@ -184,8 +184,8 @@ serve(async (req) => {
     })
 
   } catch (error) {
-    console.log('Erreur:', String(error))
-    return new Response(JSON.stringify({ error: String(error) }), {
+    console.error('labyrinthe-payment error:', String(error))
+    return new Response(JSON.stringify({ error: 'Erreur interne du serveur' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })

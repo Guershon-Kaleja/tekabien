@@ -119,19 +119,40 @@ export default function Login() {
             'Content-Type': 'application/json',
             'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({ phone: clean }),
+          body: JSON.stringify({ phone: clean, password: form.password }),
         }
       )
 
       const result = await response.json()
 
-      if (!result.found || !result.email) {
-        setError('Numéro non trouvé — essaie avec ton email')
+      if (response.status === 429) {
+        setLoginBlocked(true)
+        setError('Trop de tentatives — attends 2 minutes')
+        setTimeout(() => { setLoginBlocked(false) }, 120000)
         setLoading(false)
         return
       }
 
-      emailToUse = result.email
+      if (!result.success) {
+        const newAttempts = loginAttempts + 1
+        setLoginAttempts(newAttempts)
+        if (newAttempts >= 5) {
+          setLoginBlocked(true)
+          setError('Trop de tentatives — attends 2 minutes')
+          setTimeout(() => { setLoginBlocked(false); setLoginAttempts(0) }, 120000)
+        } else {
+          setError(result.error || 'Numéro ou mot de passe incorrect')
+        }
+        setLoading(false)
+        return
+      }
+
+      await supabase.auth.setSession({
+        access_token: result.access_token,
+        refresh_token: result.refresh_token,
+      })
+      setLoading(false)
+      return
     }
 
     const { error } = await supabase.auth.signInWithPassword({
@@ -150,7 +171,7 @@ export default function Login() {
           setLoginAttempts(0)
         }, 120000)
       } else {
-        setError('Email/numéro ou mot de passe incorrect')
+        setError('Email ou mot de passe incorrect')
       }
     }
     setLoading(false)
