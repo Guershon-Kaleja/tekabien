@@ -29,5 +29,7 @@ export default function usePlanCheck() {
 
   useEffect(() => {
     checkPlan()
+    const interval = setInterval(checkPlan, 60 * 1000)
+    return () => clearInterval(interval)
   }, [userId, userPlan])
 }
