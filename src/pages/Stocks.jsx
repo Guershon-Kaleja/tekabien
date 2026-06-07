@@ -1,4 +1,5 @@
 import { useEffect, useState, useContext } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { validateProduct, sanitize } from '../lib/validation'
 import { canAddProduct, getPlanLimits } from '../lib/planLimits'
@@ -11,10 +12,11 @@ import { UserContext } from '../context/UserContext'
 export default function Stocks() {
   usePlanCheck()
   const { userPlan, userId: contextUserId } = useContext(UserContext)
+  const [searchParams] = useSearchParams()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('tous')
+  const [filter, setFilter] = useState(searchParams.get('filter') || 'tous')
   const [showForm, setShowForm] = useState(false)
   const [formErrors, setFormErrors] = useState({})
   const [form, setForm] = useState({

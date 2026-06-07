@@ -282,7 +282,7 @@ export default function Dashboard() {
           <>
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-semibold text-[#0F172A] uppercase tracking-wide">Alertes</p>
-              <p onClick={() => navigate('/stocks')} className="text-xs text-[#1A56DB] cursor-pointer">
+              <p onClick={() => navigate('/stocks?filter=stock+bas')} className="text-xs text-[#1A56DB] cursor-pointer">
                 Voir tout
               </p>
             </div>
