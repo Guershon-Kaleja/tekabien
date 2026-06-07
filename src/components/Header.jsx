@@ -6,7 +6,7 @@ export default function Header({ title, showBack = true, showAdd = false, onAdd 
   const { isOnline } = useOffline()
 
   return (
-    <div className="bg-[#1A56DB] px-4 py-4 flex items-center justify-between">
+    <div className="bg-[#1A56DB] px-4 pb-4 flex items-center justify-between" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
       <div className="flex items-center gap-3">
         {showBack && (
           <button

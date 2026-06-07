@@ -182,7 +182,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-24">
 
-      <div className="bg-[#1A56DB] px-4 pt-4 pb-4">
+      <div className="bg-[#1A56DB] px-4 pb-4" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <img src="/icon-192.png" alt="TekaBien" className="w-8 h-8 rounded-lg" />
