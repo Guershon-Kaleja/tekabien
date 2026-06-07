@@ -1,12 +1,26 @@
 import { Capacitor } from '@capacitor/core'
-import { LocalNotifications } from '@capacitor/local-notifications'
 
 const isNative = Capacitor.isNativePlatform()
 
+let _localNotifications = null
+async function getLocalNotifications() {
+  if (!isNative) return null
+  if (!_localNotifications) {
+    try {
+      const mod = await import('@capacitor/local-notifications')
+      _localNotifications = mod.LocalNotifications
+    } catch {
+      _localNotifications = null
+    }
+  }
+  return _localNotifications
+}
+
 // ─── Permission ───────────────────────────────────────────────────────────────
 export async function requestNotificationPermission() {
-  if (isNative) {
-    const { display } = await LocalNotifications.requestPermissions()
+  const LN = await getLocalNotifications()
+  if (LN) {
+    const { display } = await LN.requestPermissions()
     return display === 'granted'
   }
   if ('Notification' in window) {
@@ -18,8 +32,9 @@ export async function requestNotificationPermission() {
 
 // ─── Envoi générique ──────────────────────────────────────────────────────────
 async function send({ id, title, body, scheduleAt }) {
-  if (isNative) {
-    await LocalNotifications.schedule({
+  const LN = await getLocalNotifications()
+  if (LN) {
+    await LN.schedule({
       notifications: [{
         id: id ?? Math.floor(Math.random() * 100000),
         title,
@@ -103,7 +118,6 @@ export async function scheduleDailySummary(salesCount, totalAmount, currency = '
 
 // ─── Annuler un rappel ────────────────────────────────────────────────────────
 export async function cancelNotification(id) {
-  if (isNative) {
-    await LocalNotifications.cancel({ notifications: [{ id }] })
-  }
+  const LN = await getLocalNotifications()
+  if (LN) await LN.cancel({ notifications: [{ id }] })
 }
