@@ -2,6 +2,7 @@ import { createContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
 const UserContext = createContext(null)
+const PROFILE_CACHE_KEY = 'tb_user_profile'
 
 export function UserProvider({ children }) {
   const [userPlan, setUserPlan] = useState(null)
@@ -11,12 +12,30 @@ export function UserProvider({ children }) {
   const [userId, setUserId] = useState(null)
   const [role, setRole] = useState(null)
 
+  const applyProfile = (data) => {
+    setUserPlan(data.plan)
+    setPlanExpires(data.plan_expires)
+    setCurrency(data.currency || 'FC')
+    setShopName(data.shop_name || '')
+    setRole(data.role)
+  }
+
   useEffect(() => {
     const loadUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       setUserId(user.id)
 
+      // Affiche immédiatement le profil depuis le cache local
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY)
+      if (cached) {
+        try {
+          const profile = JSON.parse(cached)
+          if (profile.id === user.id) applyProfile(profile)
+        } catch {}
+      }
+
+      // Tente de rafraîchir depuis Supabase
       let { data } = await supabase
         .from('users')
         .select('plan, plan_expires, currency, shop_name, role')
@@ -38,11 +57,8 @@ export function UserProvider({ children }) {
         data = { plan: 'trial', plan_expires: defaultExpires, currency: 'FC', shop_name: '', role: 'user' }
       }
 
-      setUserPlan(data.plan)
-      setPlanExpires(data.plan_expires)
-      setCurrency(data.currency || 'FC')
-      setShopName(data.shop_name || '')
-      setRole(data.role)
+      applyProfile(data)
+      localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ ...data, id: user.id }))
     }
 
     loadUser()

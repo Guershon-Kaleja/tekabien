@@ -1,6 +1,7 @@
 import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
@@ -8,11 +9,13 @@ import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import jsPDF from 'jspdf'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Rapports() {
   const navigate = useNavigate()
   usePlanCheck()
   const { userPlan, shopName: contextShopName, userId: contextUserId } = useContext(UserContext)
+  const { isOnline } = useOffline()
   const [period, setPeriod] = useState('today')
   const [customStart, setCustomStart] = useState('')
   const [customEnd, setCustomEnd] = useState('')
@@ -66,72 +69,86 @@ export default function Rapports() {
     return { start: start.toISOString(), end: end.toISOString() }
   }
 
+  const computeStats = (salesData, expensesData, start, end) => {
+    const s = start instanceof Date ? start : new Date(start)
+    const e = end instanceof Date ? end : new Date(end)
+    const filtered = (salesData || []).filter(sale => {
+      const d = new Date(sale.created_at)
+      return d >= s && d <= e
+    })
+    const expFiltered = (expensesData || []).filter(exp => {
+      const d = new Date(exp.created_at)
+      return d >= s && d <= e
+    })
+
+    const encaissees = filtered.filter(sale => sale.encaissee !== false)
+    const credits = filtered.filter(sale => sale.encaissee === false)
+    const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
+    const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
+    const totalExpenses = expFiltered.reduce((sum, e) => sum + e.amount, 0)
+    const netProfit = totalSales - totalCost - totalExpenses
+    const creditAmount = credits.reduce((sum, s) => sum + s.total, 0)
+
+    const productMap = {}
+    encaissees.forEach(s => {
+      if (!productMap[s.product_name]) productMap[s.product_name] = { name: s.product_name, total: 0, margin: 0, count: 0 }
+      productMap[s.product_name].total += s.total
+      productMap[s.product_name].margin += s.total - (s.cost || 0)
+      productMap[s.product_name].count += s.quantity
+    })
+
+    const paymentMap = {}
+    encaissees.forEach(s => {
+      if (!paymentMap[s.payment_method]) paymentMap[s.payment_method] = 0
+      paymentMap[s.payment_method] += s.total
+    })
+
+    const dayMap = {}
+    encaissees.forEach(s => {
+      const day = new Date(s.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+      if (!dayMap[day]) dayMap[day] = { day, total: 0, count: 0 }
+      dayMap[day].total += s.total
+      dayMap[day].count += 1
+    })
+
+    setStats({
+      totalSales, totalCost, salesCount: encaissees.length,
+      totalExpenses, netProfit, creditPending: credits.length,
+      creditAmount,
+      topProducts: Object.values(productMap).sort((a, b) => b.margin - a.margin).slice(0, 5),
+      paymentMethods: Object.entries(paymentMap).map(([method, total]) => ({ method, total })).sort((a, b) => b.total - a.total),
+      salesByDay: Object.values(dayMap),
+    })
+  }
+
   const fetchStats = async () => {
     if (!contextUserId) return
     setLoading(true)
+    if (!shopName) setShopName(contextShopName)
 
     const { start, end } = getDateRange()
 
-    const [
-      { data: salesData },
-      { data: expensesData },
-    ] = await Promise.all([
-      supabase.from('sales').select('*').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
-      supabase.from('expenses').select('amount').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end),
+    // Lecture locale immédiate
+    const [localSales, localExpenses] = await Promise.all([
+      localDb.sales.where('user_id').equals(contextUserId).toArray(),
+      localDb.expenses.where('user_id').equals(contextUserId).toArray(),
     ])
-
-    if (!shopName) setShopName(contextShopName)
-
-    if (salesData && expensesData) {
-      const encaissees = salesData.filter(s => s.encaissee !== false)
-      const credits = salesData.filter(s => s.encaissee === false)
-
-      const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
-      const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
-      const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
-      const netProfit = totalSales - totalCost - totalExpenses
-      const creditAmount = credits.reduce((sum, s) => sum + s.total, 0)
-
-      const productMap = {}
-      encaissees.forEach(s => {
-        if (!productMap[s.product_name]) {
-          productMap[s.product_name] = { name: s.product_name, total: 0, margin: 0, count: 0 }
-        }
-        productMap[s.product_name].total += s.total
-        productMap[s.product_name].margin += s.total - (s.cost || 0)
-        productMap[s.product_name].count += s.quantity
-      })
-      const topProducts = Object.values(productMap)
-        .sort((a, b) => b.margin - a.margin)
-        .slice(0, 5)
-
-      const paymentMap = {}
-      encaissees.forEach(s => {
-        if (!paymentMap[s.payment_method]) paymentMap[s.payment_method] = 0
-        paymentMap[s.payment_method] += s.total
-      })
-      const paymentMethods = Object.entries(paymentMap)
-        .map(([method, total]) => ({ method, total }))
-        .sort((a, b) => b.total - a.total)
-
-      const dayMap = {}
-      encaissees.forEach(s => {
-        const day = new Date(s.created_at).toLocaleDateString('fr-FR', {
-          day: '2-digit', month: '2-digit'
-        })
-        if (!dayMap[day]) dayMap[day] = { day, total: 0, count: 0 }
-        dayMap[day].total += s.total
-        dayMap[day].count += 1
-      })
-      const salesByDay = Object.values(dayMap)
-
-      setStats({
-        totalSales, totalCost, salesCount: encaissees.length,
-        totalExpenses, netProfit, creditPending: credits.length,
-        creditAmount, topProducts, paymentMethods, salesByDay,
-      })
+    if (localSales.length || localExpenses.length) {
+      computeStats(localSales, localExpenses, start, end)
+      setLoading(false)
     }
 
+    if (!isOnline) { setLoading(false); return }
+
+    const [{ data: salesData }, { data: expensesData }] = await Promise.all([
+      supabase.from('sales').select('*').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end).order('created_at', { ascending: true }),
+      supabase.from('expenses').select('amount, created_at').eq('user_id', contextUserId).gte('created_at', start).lte('created_at', end),
+    ])
+
+    if (salesData) await localDb.sales.bulkPut(salesData)
+    if (expensesData) await localDb.expenses.bulkPut(expensesData)
+
+    if (salesData || expensesData) computeStats(salesData || [], expensesData || [], start, end)
     setLoading(false)
   }
 
