@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { getPendingCount, sync, pull } from '../lib/syncEngine'
 import { UserContext } from './UserContext'
+import { localDb } from '../lib/localDb'
+import { requestNotificationPermission, notifyOverdueDebts, scheduleDailySummary } from '../lib/notifications'
 
 export const OfflineContext = createContext({
   isOnline: true,
@@ -36,11 +38,41 @@ export function OfflineProvider({ children }) {
 
   // Pull initial quand le userId est disponible et qu'on est en ligne
   useEffect(() => {
-    if (userId && navigator.onLine) {
-      pull(userId).then(refreshPending)
-    } else if (userId) {
-      refreshPending()
+    if (!userId) return
+
+    const init = async () => {
+      await requestNotificationPermission().catch(() => {})
+
+      if (navigator.onLine) await pull(userId)
+      await refreshPending()
+
+      // Vérification dettes en retard
+      const today = new Date().toISOString().split('T')[0]
+      const overdueDebts = await localDb.debts
+        .where('user_id').equals(userId)
+        .and(d => d.status === 'pending' && d.due_date && d.due_date < today)
+        .toArray()
+
+      if (overdueDebts.length) {
+        const customerIds = [...new Set(overdueDebts.map(d => d.customer_id).filter(Boolean))]
+        const customers = await localDb.customers.bulkGet(customerIds)
+        const clientsMap = Object.fromEntries(customers.filter(Boolean).map(c => [c.id, c]))
+        const overdueClients = customerIds.map(id => clientsMap[id]).filter(Boolean)
+        notifyOverdueDebts(overdueClients).catch(() => {})
+      }
+
+      // Résumé quotidien
+      const startOfDay = new Date()
+      startOfDay.setHours(0, 0, 0, 0)
+      const todaySales = await localDb.sales
+        .where('user_id').equals(userId)
+        .and(s => new Date(s.created_at) >= startOfDay)
+        .toArray()
+      const totalToday = todaySales.reduce((sum, s) => sum + (s.total || 0), 0)
+      scheduleDailySummary(todaySales.length, totalToday).catch(() => {})
     }
+
+    init()
   }, [userId, refreshPending])
 
   // Détection online/offline

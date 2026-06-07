@@ -11,6 +11,7 @@ import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
 import { useOffline } from '../context/OfflineContext'
+import { notifyLowStock, scheduleDebtReminder } from '../lib/notifications'
 
 export default function Ventes() {
   const navigate = useNavigate()
@@ -243,6 +244,15 @@ export default function Ventes() {
 
     setSuccess(true)
     setTodaySalesCount(prev => prev + 1)
+
+    // Notifications
+    if (newQtyProduct <= (selected.alert_threshold ?? 5)) {
+      notifyLowStock(selected.name, newQtyProduct).catch(() => {})
+    }
+    if (payment === 'credit' && selectedClient && creditDueDate) {
+      scheduleDebtReminder(selectedClient.name, total, creditDueDate).catch(() => {})
+    }
+
     // Mise à jour stock dans l'état local
     setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, quantity: newQtyProduct } : p))
 
