@@ -1,15 +1,19 @@
 import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
+import { addToQueue } from '../lib/syncEngine'
 import { validateExpense, sanitize } from '../lib/validation'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Depenses() {
   usePlanCheck()
   const { userId } = useContext(UserContext)
+  const { isOnline, refreshPending } = useOffline()
   const [expenses, setExpenses] = useState([])
   const [sales, setSales] = useState([])
   const [loading, setLoading] = useState(true)
@@ -64,6 +68,19 @@ export default function Depenses() {
 
     const { start, end } = getDateRange()
 
+    // Lecture locale immédiate
+    const [localExp, localSales] = await Promise.all([
+      localDb.expenses.where('user_id').equals(userId)
+        .and(e => e.created_at >= start && e.created_at <= end).toArray(),
+      localDb.sales.where('user_id').equals(userId)
+        .and(s => s.created_at >= start && s.created_at <= end).toArray(),
+    ])
+    setExpenses(localExp.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)))
+    setSales(localSales)
+    setLoading(false)
+
+    if (!isOnline) return
+
     const [
       { data: expData },
       { data: salesData },
@@ -72,9 +89,8 @@ export default function Depenses() {
       supabase.from('sales').select('total, cost, encaissee').eq('user_id', userId).gte('created_at', start).lte('created_at', end),
     ])
 
-    if (expData) setExpenses(expData)
+    if (expData) { await localDb.expenses.bulkPut(expData); setExpenses(expData) }
     if (salesData) setSales(salesData)
-    setLoading(false)
   }
 
   const handleAdd = async () => {
@@ -85,8 +101,8 @@ export default function Depenses() {
     }
     setFormErrors({})
 
-    const tempExpense = {
-      id: `temp-${Date.now()}`,
+    const newExpense = {
+      id: crypto.randomUUID(),
       user_id: userId,
       category: form.category,
       amount: parseFloat(form.amount),
@@ -94,22 +110,24 @@ export default function Depenses() {
       created_at: new Date().toISOString(),
     }
 
-    setExpenses(prev => [tempExpense, ...prev])
+    setExpenses(prev => [newExpense, ...prev])
     setShowForm(false)
     setForm({ category: 'marchandises', amount: '', note: '' })
 
-    const { error } = await supabase.from('expenses').insert({
-      user_id: userId,
-      category: tempExpense.category,
-      amount: tempExpense.amount,
-      note: tempExpense.note,
-    })
+    await localDb.expenses.put(newExpense)
+    await addToQueue('expense_insert', newExpense)
+    await refreshPending()
 
-    if (error) {
-      setExpenses(prev => prev.filter(e => e.id !== tempExpense.id))
-      setShowForm(true)
-    } else {
-      fetchData()
+    if (isOnline) {
+      const { error } = await supabase.from('expenses').upsert(newExpense)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('expense_insert')
+          .and(op => op.data?.id === newExpense.id).delete()
+        await refreshPending()
+      } else {
+        setExpenses(prev => prev.filter(e => e.id !== newExpense.id))
+        setShowForm(true)
+      }
     }
   }
 
@@ -132,17 +150,21 @@ export default function Depenses() {
     setExpenses(prev => prev.map(e => e.id === editExpense.id ? updated : e))
     setEditExpense(null)
 
-    const { error } = await supabase
-      .from('expenses')
-      .update({
-        category: updated.category,
-        amount: updated.amount,
-        note: updated.note,
-      })
-      .eq('id', editExpense.id)
+    await localDb.expenses.put(updated)
+    await addToQueue('expense_update', updated)
+    await refreshPending()
 
-    if (error) {
-      setExpenses(prev => prev.map(e => e.id === oldExpense.id ? oldExpense : e))
+    if (isOnline) {
+      const { error } = await supabase.from('expenses')
+        .update({ category: updated.category, amount: updated.amount, note: updated.note })
+        .eq('id', editExpense.id)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('expense_update')
+          .and(op => op.data?.id === updated.id).delete()
+        await refreshPending()
+      } else {
+        setExpenses(prev => prev.map(e => e.id === oldExpense.id ? oldExpense : e))
+      }
     }
   }
 
@@ -150,13 +172,19 @@ export default function Depenses() {
     setExpenses(prev => prev.filter(e => e.id !== expense.id))
     setShowDeleteConfirm(null)
 
-    const { error } = await supabase
-      .from('expenses')
-      .delete()
-      .eq('id', expense.id)
+    await localDb.expenses.delete(expense.id)
+    await addToQueue('expense_delete', { id: expense.id })
+    await refreshPending()
 
-    if (error) {
-      setExpenses(prev => [expense, ...prev])
+    if (isOnline) {
+      const { error } = await supabase.from('expenses').delete().eq('id', expense.id)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('expense_delete')
+          .and(op => op.data?.id === expense.id).delete()
+        await refreshPending()
+      } else {
+        setExpenses(prev => [expense, ...prev])
+      }
     }
   }
 

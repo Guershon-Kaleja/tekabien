@@ -1,5 +1,7 @@
 import { useEffect, useState, useContext } from 'react'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
+import { addToQueue } from '../lib/syncEngine'
 import { sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
@@ -7,10 +9,12 @@ import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Clients() {
   usePlanCheck()
   const { userPlan, userId: contextUserId } = useContext(UserContext)
+  const { isOnline, refreshPending } = useOffline()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -46,13 +50,21 @@ export default function Clients() {
   const fetchClients = async () => {
     if (!contextUserId) return
 
-    const { data: clientsData } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('user_id', contextUserId)
-      .order('name')
+    const local = await localDb.customers.where('user_id').equals(contextUserId).toArray()
+    if (local.length > 0) {
+      setClients(local.sort((a, b) => a.name.localeCompare(b.name)))
+      setLoading(false)
+    }
 
-    if (clientsData) setClients(clientsData)
+    if (!isOnline) { setLoading(false); return }
+
+    const { data: clientsData } = await supabase
+      .from('customers').select('*').eq('user_id', contextUserId).order('name')
+
+    if (clientsData) {
+      await localDb.customers.bulkPut(clientsData)
+      setClients(clientsData)
+    }
     setLoading(false)
   }
 
@@ -76,30 +88,33 @@ export default function Clients() {
   }
   setFormErrors({})
 
-  const tempClient = {
-    id: `temp-${Date.now()}`,
+  const newClient = {
+    id: crypto.randomUUID(),
     user_id: contextUserId,
     name: sanitize(form.name.trim()),
     total_debt: 0,
     total_paid: 0,
+    created_at: new Date().toISOString(),
   }
 
-  setClients(prev => [...prev, tempClient].sort((a, b) => a.name.localeCompare(b.name)))
+  setClients(prev => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)))
   setShowForm(false)
   setForm({ name: '' })
 
-  const { error } = await supabase.from('customers').insert({
-    user_id: contextUserId,
-    name: tempClient.name,
-    total_debt: 0,
-    total_paid: 0,
-  })
+  await localDb.customers.put(newClient)
+  await addToQueue('customer_insert', newClient)
+  await refreshPending()
 
-  if (error) {
-    setClients(prev => prev.filter(c => c.id !== tempClient.id))
-    setShowForm(true)
-  } else {
-    fetchClients()
+  if (isOnline) {
+    const { error } = await supabase.from('customers').upsert(newClient)
+    if (!error) {
+      await localDb.sync_queue.where('type').equals('customer_insert')
+        .and(op => op.data?.id === newClient.id).delete()
+      await refreshPending()
+    } else {
+      setClients(prev => prev.filter(c => c.id !== newClient.id))
+      setShowForm(true)
+    }
   }
 }
 
@@ -111,17 +126,25 @@ const handleEditClient = async () => {
   setEditErrors({})
 
   const oldName = selectedClient.name
-  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: sanitize(editForm.name.trim()) } : c))
+  const updatedClient = { ...selectedClient, name: sanitize(editForm.name.trim()) }
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c))
   setShowEditForm(false)
   setSelectedClient(null)
 
-  const { error } = await supabase
-    .from('customers')
-    .update({ name: sanitize(editForm.name.trim()) })
-    .eq('id', selectedClient.id)
+  await localDb.customers.put(updatedClient)
+  await addToQueue('customer_update', updatedClient)
+  await refreshPending()
 
-  if (error) {
-    setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: oldName } : c))
+  if (isOnline) {
+    const { error } = await supabase.from('customers')
+      .update({ name: updatedClient.name }).eq('id', selectedClient.id)
+    if (!error) {
+      await localDb.sync_queue.where('type').equals('customer_update')
+        .and(op => op.data?.id === updatedClient.id).delete()
+      await refreshPending()
+    } else {
+      setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, name: oldName } : c))
+    }
   }
 }
 
@@ -129,14 +152,24 @@ const handleDeleteClient = async (client) => {
   setClients(prev => prev.filter(c => c.id !== client.id))
   setShowDeleteClient(null)
 
-  await supabase.from('sales').update({ customer_id: null, customer_name: null }).eq('customer_id', client.id)
-  await supabase.from('debt_payments').delete().eq('customer_id', client.id)
-  await supabase.from('debts').delete().eq('customer_id', client.id)
+  await localDb.customers.delete(client.id)
+  await localDb.debts.where('customer_id').equals(client.id).delete()
+  await localDb.debt_payments.where('customer_id').equals(client.id).delete()
+  await addToQueue('customer_delete', { id: client.id })
+  await refreshPending()
 
-  const { error } = await supabase.from('customers').delete().eq('id', client.id)
-
-  if (error) {
-    setClients(prev => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)))
+  if (isOnline) {
+    await supabase.from('sales').update({ customer_id: null, customer_name: null }).eq('customer_id', client.id)
+    await supabase.from('debt_payments').delete().eq('customer_id', client.id)
+    await supabase.from('debts').delete().eq('customer_id', client.id)
+    const { error } = await supabase.from('customers').delete().eq('id', client.id)
+    if (!error) {
+      await localDb.sync_queue.where('type').equals('customer_delete')
+        .and(op => op.data?.id === client.id).delete()
+      await refreshPending()
+    } else {
+      setClients(prev => [...prev, client].sort((a, b) => a.name.localeCompare(b.name)))
+    }
   }
 }
 
@@ -153,24 +186,39 @@ const handlePartialPay = async () => {
   const newDebt = selectedClient.total_debt - amount
   const newPaid = (selectedClient.total_paid || 0) + amount
 
-  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, total_debt: newDebt, total_paid: newPaid } : c))
-  setShowPayForm(false)
-  setPayForm({ amount: '', note: '' })
-
-  await supabase.from('debt_payments').insert({
+  const paymentRecord = {
+    id: crypto.randomUUID(),
     user_id: contextUserId,
     customer_id: selectedClient.id,
     amount,
     note: sanitize(payForm.note) || 'Remboursement partiel',
+    created_at: new Date().toISOString(),
+  }
+
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, total_debt: newDebt, total_paid: newPaid } : c))
+  setShowPayForm(false)
+  setPayForm({ amount: '', note: '' })
+
+  await localDb.debt_payments.put(paymentRecord)
+  await localDb.customers.update(selectedClient.id, { total_debt: newDebt, total_paid: newPaid })
+  await addToQueue('payment_insert', {
+    payment: paymentRecord,
+    customerId: selectedClient.id,
+    newDebt,
+    newPaid,
   })
+  await refreshPending()
 
-  await supabase.from('customers')
-    .update({ total_debt: newDebt, total_paid: newPaid })
-    .eq('id', selectedClient.id)
-
-  if (newDebt === 0) {
-    await supabase.from('sales').update({ encaissee: true }).eq('customer_id', selectedClient.id).eq('payment_method', 'credit').eq('encaissee', false)
-    await supabase.from('debts').update({ status: 'paid', paid: selectedClient.total_debt }).eq('customer_id', selectedClient.id).eq('status', 'pending')
+  if (isOnline) {
+    await supabase.from('debt_payments').upsert(paymentRecord)
+    await supabase.from('customers').update({ total_debt: newDebt, total_paid: newPaid }).eq('id', selectedClient.id)
+    if (newDebt === 0) {
+      await supabase.from('sales').update({ encaissee: true }).eq('customer_id', selectedClient.id).eq('payment_method', 'credit').eq('encaissee', false)
+      await supabase.from('debts').update({ status: 'paid', paid: selectedClient.total_debt }).eq('customer_id', selectedClient.id).eq('status', 'pending')
+    }
+    await localDb.sync_queue.where('type').equals('payment_insert')
+      .and(op => op.data?.payment?.id === paymentRecord.id).delete()
+    await refreshPending()
   }
 }
 

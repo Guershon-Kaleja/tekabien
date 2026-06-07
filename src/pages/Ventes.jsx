@@ -1,6 +1,8 @@
 import { useEffect, useState, useContext } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
+import { addToQueue } from '../lib/syncEngine'
 import { sanitize } from '../lib/validation'
 import { canAddSale, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
@@ -8,12 +10,14 @@ import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Ventes() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   usePlanCheck()
-   const { userPlan, userId: contextUserId } = useContext(UserContext)
+  const { userPlan, userId: contextUserId } = useContext(UserContext)
+  const { isOnline, refreshPending } = useOffline()
   const [activeTab, setActiveTab] = useState(
     searchParams.get('tab') === 'history' ? 'history' : 'new'
   )
@@ -60,6 +64,19 @@ export default function Ventes() {
     const startOfDay = new Date()
     startOfDay.setHours(0, 0, 0, 0)
 
+    // Lecture locale immédiate
+    const [localProducts, localClients, localSalesToday] = await Promise.all([
+      localDb.products.where('user_id').equals(contextUserId).toArray(),
+      localDb.customers.where('user_id').equals(contextUserId).toArray(),
+      localDb.sales.where('user_id').equals(contextUserId)
+        .and(s => new Date(s.created_at) >= startOfDay).toArray(),
+    ])
+    if (localProducts.length) setProducts(localProducts.sort((a, b) => a.name.localeCompare(b.name)))
+    if (localClients.length) setClients(localClients.sort((a, b) => a.name.localeCompare(b.name)))
+    setTodaySalesCount(localSalesToday.length)
+
+    // Mise à jour Supabase si en ligne
+    if (!isOnline) return
     const [
       { data: productsData },
       { data: clientsData },
@@ -70,8 +87,8 @@ export default function Ventes() {
       supabase.from('sales').select('id').eq('user_id', contextUserId).gte('created_at', startOfDay.toISOString()),
     ])
 
-    if (productsData) setProducts(productsData)
-    if (clientsData) setClients(clientsData)
+    if (productsData) { await localDb.products.bulkPut(productsData); setProducts(productsData) }
+    if (clientsData) { await localDb.customers.bulkPut(clientsData); setClients(clientsData) }
     if (salesData) setTodaySalesCount(salesData.length)
   }
 
@@ -92,6 +109,23 @@ export default function Ventes() {
       start.setHours(0, 0, 0, 0)
     }
 
+    // Lecture locale d'abord
+    let localSales = await localDb.sales.where('user_id').equals(contextUserId).toArray()
+    if (historyFilter === 'custom' && historyCustomStart) {
+      const cEnd = historyCustomEnd || historyCustomStart
+      localSales = localSales.filter(s => {
+        const d = new Date(s.created_at)
+        return d >= new Date(historyCustomStart) && d <= new Date(cEnd + 'T23:59:59')
+      })
+    } else if (historyFilter !== 'custom') {
+      localSales = localSales.filter(s => new Date(s.created_at) >= start && new Date(s.created_at) <= end)
+    }
+    localSales.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    setAllSales(localSales)
+    setSalesLoading(false)
+
+    if (!isOnline) return
+
     let query = supabase
       .from('sales').select('*').eq('user_id', contextUserId)
       .order('created_at', { ascending: false }).limit(100)
@@ -102,14 +136,14 @@ export default function Ventes() {
         .gte('created_at', new Date(historyCustomStart).toISOString())
         .lte('created_at', new Date(cEnd + 'T23:59:59').toISOString())
     } else if (historyFilter !== 'custom') {
-      query = query
-        .gte('created_at', start.toISOString())
-        .lte('created_at', end.toISOString())
+      query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
     }
 
     const { data } = await query
-    if (data) setAllSales(data)
-    setSalesLoading(false)
+    if (data) {
+      await localDb.sales.bulkPut(data)
+      setAllSales(data)
+    }
   }
 
   useEffect(() => {
@@ -157,7 +191,12 @@ export default function Ventes() {
     setError('')
     setLoading(true)
 
+    const saleId = crypto.randomUUID()
+    const newQtyProduct = selected.quantity - quantity
+    const debtId = payment === 'credit' ? crypto.randomUUID() : null
+
     const saleData = {
+      id: saleId,
       user_id: contextUserId,
       product_id: selected.id,
       product_name: sanitize(selected.name),
@@ -167,43 +206,72 @@ export default function Ventes() {
       customer_id: payment === 'credit' ? selectedClient?.id : null,
       customer_name: payment === 'credit' ? selectedClient?.name : null,
       encaissee: payment !== 'credit',
+      created_at: new Date().toISOString(),
     }
 
-    const { error: saleError } = await supabase.from('sales').insert(saleData)
-    if (!saleError) {
-      await supabase.from('products')
-        .update({ quantity: selected.quantity - quantity }).eq('id', selected.id)
+    const debtData = payment === 'credit' && selectedClient ? {
+      id: debtId,
+      user_id: contextUserId,
+      customer_id: selectedClient.id,
+      amount: total,
+      paid: 0,
+      status: 'pending',
+      note: `Vente crédit — ${sanitize(selected.name)}`,
+      due_date: creditDueDate || null,
+    } : null
 
-      if (payment === 'credit' && selectedClient) {
-        await supabase.from('debts').insert({
-          user_id: contextUserId,
-          customer_id: selectedClient.id,
-          amount: total,
-          paid: 0,
-          status: 'pending',
-          note: `Vente crédit — ${sanitize(selected.name)}`,
-          due_date: creditDueDate || null,
-        })
-        await supabase.from('customers')
-          .update({ total_debt: selectedClient.total_debt + total })
-          .eq('id', selectedClient.id)
+    // Écriture locale immédiate
+    await localDb.sales.put(saleData)
+    await localDb.products.update(selected.id, { quantity: newQtyProduct })
+    if (debtData) await localDb.debts.put(debtData)
+    if (payment === 'credit' && selectedClient) {
+      await localDb.customers.update(selectedClient.id, {
+        total_debt: selectedClient.total_debt + total
+      })
+    }
+
+    // Queue delta-based pour sync multi-appareil
+    await addToQueue('sale_create', {
+      sale: saleData,
+      productId: selected.id,
+      quantityDelta: -quantity,
+      debt: debtData,
+      customerId: payment === 'credit' ? selectedClient?.id : null,
+      customerDebtDelta: payment === 'credit' ? total : 0,
+    })
+    await refreshPending()
+
+    setSuccess(true)
+    setTodaySalesCount(prev => prev + 1)
+    // Mise à jour stock dans l'état local
+    setProducts(prev => prev.map(p => p.id === selected.id ? { ...p, quantity: newQtyProduct } : p))
+
+    // Sync immédiate si en ligne
+    if (isOnline) {
+      const { error: saleError } = await supabase.from('sales').upsert(saleData)
+      if (!saleError) {
+        await supabase.from('products').update({ quantity: newQtyProduct }).eq('id', selected.id)
+        if (debtData) await supabase.from('debts').upsert(debtData)
+        if (payment === 'credit' && selectedClient) {
+          await supabase.from('customers')
+            .update({ total_debt: selectedClient.total_debt + total }).eq('id', selectedClient.id)
+        }
+        await localDb.sync_queue.where('type').equals('sale_create')
+          .and(op => op.data?.sale?.id === saleId).delete()
+        await refreshPending()
       }
-
-      setSuccess(true)
-      setTodaySalesCount(prev => prev + 1)
-      setTimeout(() => {
-        setSuccess(false)
-        setSelected(null)
-        setQuantity(1)
-        setPayment('cash')
-        setSelectedClient(null)
-        setError('')
-        setCreditDueDate('') 
-        fetchData()
-      }, 1500)
-    } else {
-      setError("Erreur lors de l'enregistrement — réessaie")
     }
+
+    setTimeout(() => {
+      setSuccess(false)
+      setSelected(null)
+      setQuantity(1)
+      setPayment('cash')
+      setSelectedClient(null)
+      setError('')
+      setCreditDueDate('')
+      fetchData()
+    }, 1500)
     setLoading(false)
   }
 
@@ -213,31 +281,57 @@ export default function Ventes() {
     setAllSales(prev => prev.filter(s => s.id !== sale.id))
     setShowCancelConfirm(null)
 
-    try {
-      const { error } = await supabase.from('sales').delete().eq('id', sale.id)
-      if (!error) {
-        if (sale.product_id) {
-          const { data: product } = await supabase
-            .from('products').select('quantity').eq('id', sale.product_id).single()
-          if (product) {
-            await supabase.from('products')
-              .update({ quantity: product.quantity + sale.quantity }).eq('id', sale.product_id)
+    // Annulation locale immédiate
+    await localDb.sales.delete(sale.id)
+    if (sale.product_id) {
+      const localProduct = await localDb.products.get(sale.product_id)
+      if (localProduct) {
+        await localDb.products.update(sale.product_id, { quantity: localProduct.quantity + sale.quantity })
+        setProducts(prev => prev.map(p =>
+          p.id === sale.product_id ? { ...p, quantity: localProduct.quantity + sale.quantity } : p
+        ))
+      }
+    }
+
+    await addToQueue('sale_cancel', {
+      saleId: sale.id,
+      productId: sale.product_id,
+      quantityDelta: sale.quantity,
+      customerId: sale.payment_method === 'credit' ? sale.customer_id : null,
+      saleTotal: sale.total,
+    })
+    await refreshPending()
+
+    if (isOnline) {
+      try {
+        const { error } = await supabase.from('sales').delete().eq('id', sale.id)
+        if (!error) {
+          if (sale.product_id) {
+            const { data: product } = await supabase
+              .from('products').select('quantity').eq('id', sale.product_id).single()
+            if (product) {
+              await supabase.from('products')
+                .update({ quantity: product.quantity + sale.quantity }).eq('id', sale.product_id)
+            }
           }
-        }
-        if (sale.payment_method === 'credit' && sale.customer_id) {
-          const { data: customer } = await supabase
-            .from('customers').select('total_debt').eq('id', sale.customer_id).single()
-          if (customer) {
-            await supabase.from('customers')
-              .update({ total_debt: Math.max(0, customer.total_debt - sale.total) })
-              .eq('id', sale.customer_id)
+          if (sale.payment_method === 'credit' && sale.customer_id) {
+            const { data: customer } = await supabase
+              .from('customers').select('total_debt').eq('id', sale.customer_id).single()
+            if (customer) {
+              await supabase.from('customers')
+                .update({ total_debt: Math.max(0, customer.total_debt - sale.total) })
+                .eq('id', sale.customer_id)
+            }
           }
+          await localDb.sync_queue.where('type').equals('sale_cancel')
+            .and(op => op.data?.saleId === sale.id).delete()
+          await refreshPending()
+        } else {
+          setAllSales(prev => [sale, ...prev])
         }
-      } else {
+      } catch {
         setAllSales(prev => [sale, ...prev])
       }
-    } catch {
-      setAllSales(prev => [sale, ...prev])
     }
 
     setCancelling(false)

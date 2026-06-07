@@ -1,6 +1,8 @@
 import { useEffect, useState, useContext } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
+import { addToQueue } from '../lib/syncEngine'
 import { validateProduct, sanitize } from '../lib/validation'
 import { canAddProduct, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
@@ -8,10 +10,12 @@ import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Stocks() {
   usePlanCheck()
   const { userPlan, userId: contextUserId } = useContext(UserContext)
+  const { isOnline, refreshPending } = useOffline()
   const [searchParams] = useSearchParams()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -40,13 +44,24 @@ export default function Stocks() {
   const fetchProducts = async () => {
     if (!contextUserId) return
 
-    const { data: productsData } = await supabase
-      .from('products')
-      .select('*')
-      .eq('user_id', contextUserId)
-      .order('name')
+    // Affichage immédiat depuis la DB locale
+    const local = await localDb.products
+      .where('user_id').equals(contextUserId)
+      .toArray()
+    if (local.length > 0) {
+      setProducts(local.sort((a, b) => a.name.localeCompare(b.name)))
+      setLoading(false)
+    }
 
-    if (productsData) setProducts(productsData)
+    // Mise à jour depuis Supabase si en ligne
+    if (isOnline) {
+      const { data } = await supabase
+        .from('products').select('*').eq('user_id', contextUserId).order('name')
+      if (data) {
+        await localDb.products.bulkPut(data)
+        setProducts(data)
+      }
+    }
     setLoading(false)
   }
 
@@ -65,8 +80,8 @@ export default function Stocks() {
     }
     setFormErrors({})
 
-    const tempProduct = {
-      id: `temp-${Date.now()}`,
+    const newProduct = {
+      id: crypto.randomUUID(),
       user_id: contextUserId,
       name: sanitize(form.name),
       price_sell: parseFloat(form.price_sell),
@@ -74,26 +89,23 @@ export default function Stocks() {
       quantity: parseInt(form.quantity),
       alert_threshold: parseInt(form.alert_threshold) || 5,
       category: sanitize(form.category),
+      created_at: new Date().toISOString(),
     }
-    setProducts(prev => [...prev, tempProduct].sort((a, b) => a.name.localeCompare(b.name)))
+    setProducts(prev => [...prev, newProduct].sort((a, b) => a.name.localeCompare(b.name)))
     setShowForm(false)
     setForm({ name: '', price_sell: '', price_buy: '', quantity: '', alert_threshold: '5', category: 'alimentation' })
 
-    const { error } = await supabase.from('products').insert({
-      user_id: contextUserId,
-      name: tempProduct.name,
-      price_sell: tempProduct.price_sell,
-      price_buy: tempProduct.price_buy,
-      quantity: tempProduct.quantity,
-      alert_threshold: tempProduct.alert_threshold,
-      category: tempProduct.category,
-    })
+    await localDb.products.put(newProduct)
+    await addToQueue('product_insert', newProduct)
+    await refreshPending()
 
-    if (error) {
-      setProducts(prev => prev.filter(p => p.id !== tempProduct.id))
-      setShowForm(true)
-    } else {
-      fetchProducts() 
+    if (isOnline) {
+      const { error } = await supabase.from('products').upsert(newProduct)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('product_insert')
+          .and(op => op.data?.id === newProduct.id).delete()
+        await refreshPending()
+      }
     }
   }
 
@@ -118,20 +130,27 @@ export default function Stocks() {
     setProducts(prev => prev.map(p => p.id === editProduct.id ? updatedProduct : p))
     setEditProduct(null)
 
-    const { error } = await supabase
-      .from('products')
-      .update({
+    await localDb.products.put(updatedProduct)
+    await addToQueue('product_update', updatedProduct)
+    await refreshPending()
+
+    if (isOnline) {
+      const { error } = await supabase.from('products').update({
         name: updatedProduct.name,
         price_sell: updatedProduct.price_sell,
         price_buy: updatedProduct.price_buy,
         quantity: updatedProduct.quantity,
         alert_threshold: updatedProduct.alert_threshold,
         category: updatedProduct.category,
-      })
-      .eq('id', editProduct.id)
+      }).eq('id', editProduct.id)
 
-    if (error) {
-      setProducts(prev => prev.map(p => p.id === editProduct.id ? editProduct : p))
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('product_update')
+          .and(op => op.data?.id === updatedProduct.id).delete()
+        await refreshPending()
+      } else {
+        setProducts(prev => prev.map(p => p.id === editProduct.id ? editProduct : p))
+      }
     }
   }
 
@@ -139,13 +158,19 @@ export default function Stocks() {
     setProducts(prev => prev.filter(p => p.id !== product.id))
     setShowDeleteConfirm(null)
 
-    const { error } = await supabase
-      .from('products')
-      .delete()
-      .eq('id', product.id)
+    await localDb.products.delete(product.id)
+    await addToQueue('product_delete', { id: product.id })
+    await refreshPending()
 
-    if (error) {
-      setProducts(prev => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)))
+    if (isOnline) {
+      const { error } = await supabase.from('products').delete().eq('id', product.id)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('product_delete')
+          .and(op => op.data?.id === product.id).delete()
+        await refreshPending()
+      } else {
+        setProducts(prev => [...prev, product].sort((a, b) => a.name.localeCompare(b.name)))
+      }
     }
   }
 
@@ -159,17 +184,24 @@ export default function Stocks() {
 
     const newQty = restock.quantity + qty
 
-    setProducts(prev => prev.map(p => p.id === restock.id ? { ...p, quantity: newQty } : p))
+    const restockProduct = { ...restock, quantity: newQty }
+    setProducts(prev => prev.map(p => p.id === restock.id ? restockProduct : p))
     setRestock(null)
     setRestockQty('')
 
-    const { error } = await supabase
-      .from('products')
-      .update({ quantity: newQty })
-      .eq('id', restock.id)
+    await localDb.products.update(restock.id, { quantity: newQty })
+    await addToQueue('product_update', restockProduct)
+    await refreshPending()
 
-    if (error) {
-      setProducts(prev => prev.map(p => p.id === restock.id ? { ...p, quantity: restock.quantity } : p))
+    if (isOnline) {
+      const { error } = await supabase.from('products').update({ quantity: newQty }).eq('id', restock.id)
+      if (!error) {
+        await localDb.sync_queue.where('type').equals('product_update')
+          .and(op => op.data?.id === restock.id).delete()
+        await refreshPending()
+      } else {
+        setProducts(prev => prev.map(p => p.id === restock.id ? { ...p, quantity: restock.quantity } : p))
+      }
     }
   }
 
