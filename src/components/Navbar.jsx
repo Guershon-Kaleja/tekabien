@@ -14,8 +14,8 @@ export default function Navbar() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around pt-2 px-2 z-40"
-      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 8px)' }}
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex justify-around pt-1 px-2 z-40"
+      style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 4px)' }}
     >
       {items.map((item) => (
         <button
