@@ -4,6 +4,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  build: {
+    rollupOptions: {
+      external: ['@capacitor/local-notifications'],
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
