@@ -12,13 +12,12 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
-html {
+html, body {
   background-color: #1A56DB;
   overscroll-behavior: none;
 }
 
-body {
-  overscroll-behavior: none;
+#root {
   background-color: #EEF2F7;
 }
 
