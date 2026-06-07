@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { getPendingCount, sync, pull } from '../lib/syncEngine'
 import { UserContext } from './UserContext'
 
@@ -59,8 +59,13 @@ export function OfflineProvider({ children }) {
     }
   }, [triggerSync])
 
+  const value = useMemo(
+    () => ({ isOnline, pendingCount, syncing, triggerSync, refreshPending }),
+    [isOnline, pendingCount, syncing, triggerSync, refreshPending]
+  )
+
   return (
-    <OfflineContext.Provider value={{ isOnline, pendingCount, syncing, triggerSync, refreshPending }}>
+    <OfflineContext.Provider value={value}>
       {children}
     </OfflineContext.Provider>
   )

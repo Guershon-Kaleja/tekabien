@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Header({ title, showBack = true, showAdd = false, onAdd }) {
   const navigate = useNavigate()
+  const { isOnline } = useOffline()
 
   return (
     <div className="bg-[#1A56DB] px-4 py-4 flex items-center justify-between">
@@ -14,7 +16,12 @@ export default function Header({ title, showBack = true, showAdd = false, onAdd 
             <span className="text-white">←</span>
           </button>
         )}
-        <h1 className="text-white font-semibold text-base">{title}</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-white font-semibold text-base">{title}</h1>
+          {!isOnline && (
+            <span className="w-2 h-2 rounded-full bg-yellow-300 inline-block" title="Hors connexion" />
+          )}
+        </div>
       </div>
       {showAdd && (
         <button

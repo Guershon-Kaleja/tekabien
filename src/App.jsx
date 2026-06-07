@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import { OfflineProvider } from './context/OfflineContext'
-import OfflineBanner from './components/OfflineBanner'
 
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
@@ -47,7 +46,6 @@ function App() {
     <BrowserRouter>
       <OfflineProvider>
       <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
-        <OfflineBanner />
         <Suspense fallback={
           <div className="bg-[#EEF2F7] flex items-center justify-center" style={{ height: '100dvh' }}>
             <div className="text-center">

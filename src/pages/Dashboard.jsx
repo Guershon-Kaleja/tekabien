@@ -1,15 +1,18 @@
 import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { localDb } from '../lib/localDb'
 import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Dashboard() {
   const navigate = useNavigate()
   usePlanCheck()
   const { userPlan, planExpires, shopName: contextShopName, userId } = useContext(UserContext)
+  const { isOnline } = useOffline()
   const [shopName, setShopName] = useState('')
   const [todaySales, setTodaySales] = useState(0)
   const [salesCount, setSalesCount] = useState(0)
@@ -47,49 +50,66 @@ export default function Dashboard() {
   }, [userId])
 
 
+  const applyData = (salesData, expensesData, customersData, productsData) => {
+    if (salesData) {
+      const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+      const todaySales = salesData.filter(s => new Date(s.created_at) >= startOfDay)
+      const encaissees = todaySales.filter(s => s.encaissee !== false)
+      const credits = todaySales.filter(s => s.encaissee === false)
+      const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
+      const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
+      setTodaySales(totalSales)
+      setSalesCount(encaissees.length)
+      setCreditPending(credits.length)
+      setLastSales(salesData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 3))
+      if (expensesData) {
+        const todayExp = expensesData.filter(e => new Date(e.created_at) >= startOfDay)
+        const totalExpenses = todayExp.reduce((sum, e) => sum + e.amount, 0)
+        setNetProfit(totalSales - totalCost - totalExpenses)
+      }
+    }
+    if (customersData) {
+      const withDebt = customersData.filter(c => c.total_debt > 0)
+      setDebtCount(withDebt.length)
+      setTotalDebt(withDebt.reduce((sum, c) => sum + c.total_debt, 0))
+    }
+    if (productsData) {
+      setLowStock(productsData.filter(p => p.quantity <= p.alert_threshold))
+    }
+  }
+
   const fetchData = async () => {
     if (!userId) return
 
-    const startOfDay = new Date()
-    startOfDay.setHours(0, 0, 0, 0)
+    // Lecture locale immédiate — le dashboard se met à jour sans réseau
+    const [localSales, localExpenses, localCustomers, localProducts] = await Promise.all([
+      localDb.sales.where('user_id').equals(userId).toArray(),
+      localDb.expenses.where('user_id').equals(userId).toArray(),
+      localDb.customers.where('user_id').equals(userId).toArray(),
+      localDb.products.where('user_id').equals(userId).toArray(),
+    ])
 
+    if (localSales.length || localProducts.length || localCustomers.length) {
+      applyData(localSales, localExpenses, localCustomers, localProducts)
+      setLoading(false)
+    }
+
+    if (!isOnline) { setLoading(false); return }
+
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
     const [
       { data: salesData },
       { data: expensesData },
       { data: customersData },
       { data: productsData },
     ] = await Promise.all([
-      supabase.from('sales').select('*').eq('user_id', userId).gte('created_at', startOfDay.toISOString()).order('created_at', { ascending: false }),
-      supabase.from('expenses').select('amount').eq('user_id', userId).gte('created_at', startOfDay.toISOString()),
-      supabase.from('customers').select('total_debt').eq('user_id', userId).gt('total_debt', 0),
+      supabase.from('sales').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(100),
+      supabase.from('expenses').select('amount, created_at').eq('user_id', userId).gte('created_at', startOfDay.toISOString()),
+      supabase.from('customers').select('total_debt').eq('user_id', userId),
       supabase.from('products').select('*').eq('user_id', userId),
     ])
 
-    if (salesData) {
-      const encaissees = salesData.filter(s => s.encaissee !== false)
-      const credits = salesData.filter(s => s.encaissee === false)
-      const totalSales = encaissees.reduce((sum, s) => sum + s.total, 0)
-      const totalCost = encaissees.reduce((sum, s) => sum + (s.cost || 0), 0)
-
-      setTodaySales(totalSales)
-      setSalesCount(encaissees.length)
-      setCreditPending(credits.length)
-      setLastSales(salesData.slice(0, 3))
-
-      if (expensesData) {
-        const totalExpenses = expensesData.reduce((sum, e) => sum + e.amount, 0)
-        setNetProfit(totalSales - totalCost - totalExpenses)
-      }
-    }
-
-    if (customersData) {
-      setDebtCount(customersData.length)
-      setTotalDebt(customersData.reduce((sum, c) => sum + c.total_debt, 0))
-    }
-
-    if (productsData) {
-      setLowStock(productsData.filter(p => p.quantity <= p.alert_threshold))
-    }
+    applyData(salesData, expensesData, customersData, productsData)
 
     setLoading(false)
   }
@@ -167,7 +187,10 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <img src="/icon-192.png" alt="TekaBien" className="w-8 h-8 rounded-lg" />
             <div>
-              <p className="text-white font-semibold text-sm">{shopName}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-white font-semibold text-sm">{shopName}</p>
+                {!isOnline && <span className="w-2 h-2 rounded-full bg-yellow-300 inline-block" />}
+              </div>
               <p className="text-xs capitalize" style={{ color: 'rgba(255,255,255,0.7)' }}>{dateStr}</p>
             </div>
           </div>
