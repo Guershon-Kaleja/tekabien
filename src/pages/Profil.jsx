@@ -5,63 +5,69 @@ import { sanitize } from '../lib/validation'
 import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import { UserContext } from '../context/UserContext'
+import { hapticLight, hapticSuccess, hapticError } from '../lib/haptics'
 
 export default function Profil() {
   const navigate = useNavigate()
-  const { userId } = useContext(UserContext)
-  const [loading, setLoading] = useState(true)
+  const { userId, shopName, userPlan: ctxPlan, currency: ctxCurrency, setCurrency: setContextCurrency } = useContext(UserContext)
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState(null)
-  const [form, setForm] = useState({ shop_name: '', phone: '', currency: 'FC' })
+  // Pré-rempli depuis le cache UserContext — affichage immédiat
+  const [form, setForm] = useState({
+    shop_name: shopName || '',
+    phone: '',
+    currency: ctxCurrency || 'FC',
+  })
   const [passwordForm, setPasswordForm] = useState({ new: '', confirm: '' })
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
   const [passwordError, setPasswordError] = useState('')
   const [passwordSuccess, setPasswordSuccess] = useState('')
   const [activeTab, setActiveTab] = useState('profil')
-  const [userPlan, setUserPlan] = useState(null)
+  const [userPlan, setUserPlan] = useState(ctxPlan || null)
   const [planExpires, setPlanExpires] = useState(null)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [payments, setPayments] = useState([])
+  const [paymentsLoaded, setPaymentsLoaded] = useState(false)
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [deletingAccount, setDeletingAccount] = useState(false)
-  const {setCurrency: setContextCurrency } = useContext(UserContext)
 
   const DISPLAY_PRICES = {
     USD: { 1: 5, 3: 13.50, 6: 25.50, 12: 48 },
     CDF: { 1: 12000, 3: 32400, 6: 61200, 12: 115200 },
   }
 
+  // Récupère seulement phone + email + plan_expires (les champs non cachés)
   useEffect(() => {
-    if (userId) fetchProfile()
+    if (!userId) return
+    supabase.from('users')
+      .select('phone, plan, plan_expires, currency, email')
+      .eq('id', userId).single()
+      .then(({ data }) => {
+        if (!data) return
+        setUser({ email: data.email })
+        setForm(prev => ({
+          ...prev,
+          phone: data.phone || '',
+          currency: data.currency || prev.currency,
+        }))
+        setUserPlan(data.plan)
+        setPlanExpires(data.plan_expires)
+      })
   }, [userId])
 
-  const fetchProfile = async () => {
-    if (!userId) return
-
-    const [
-      { data },
-      { data: paymentsData },
-    ] = await Promise.all([
-      supabase.from('users').select('shop_name, phone, plan, plan_expires, currency, email').eq('id', userId).single(),
-      supabase.from('payments').select('*').eq('user_id', userId).eq('status', 'completed').order('created_at', { ascending: false }),
-    ])
-
-    if (data) {
-      setUser({ email: data.email })
-      setForm({
-        shop_name: data.shop_name || '',
-        phone: data.phone || '',
-        currency: data.currency || 'FC',
+  // Paiements chargés uniquement quand l'onglet est ouvert
+  useEffect(() => {
+    if (activeTab !== 'paiements' || paymentsLoaded || !userId) return
+    supabase.from('payments').select('*')
+      .eq('user_id', userId).eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (data) setPayments(data)
+        setPaymentsLoaded(true)
       })
-      setUserPlan(data.plan)
-      setPlanExpires(data.plan_expires)
-    }
-
-    if (paymentsData) setPayments(paymentsData)
-    setLoading(false)
-  }
+  }, [activeTab, paymentsLoaded, userId])
 
   const handleSaveProfile = async () => {
     if (!form.shop_name || form.shop_name.trim().length < 2) {
@@ -88,9 +94,12 @@ export default function Profil() {
       .eq('id', userId)
 
     if (!error) {
+      hapticSuccess()
       setSuccess('Profil mis à jour avec succès ✅')
-      setContextCurrency(form.currency) 
+      setContextCurrency(form.currency)
       setTimeout(() => setSuccess(''), 3000)
+    } else {
+      hapticError()
     }
     setSaving(false)
   }
@@ -149,14 +158,6 @@ export default function Profil() {
   const getPlanColor = (plan) => ({ trial: '#B45309', pro: '#16A34A', free: '#64748B' })[plan] || '#64748B'
   const getPlanBg = (plan) => ({ trial: '#FFFBEB', pro: '#F0FDF4', free: '#F8FAFC' })[plan] || '#F8FAFC'
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#EEF2F7] flex items-center justify-center">
-        <p className="text-[#1A56DB] font-semibold">Chargement...</p>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-[#EEF2F7] pb-32">
 
@@ -171,7 +172,7 @@ export default function Profil() {
         ].map((t) => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => { hapticLight(); setActiveTab(t.id) }}
             className={`flex-1 py-2 px-0 text-[9px] font-semibold transition-colors text-center ${
               activeTab === t.id
                 ? 'text-[#1A56DB] border-b-2 border-[#1A56DB]'

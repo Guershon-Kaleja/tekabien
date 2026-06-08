@@ -12,6 +12,7 @@ import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
 import { useOffline } from '../context/OfflineContext'
 import { notifyLowStock, scheduleDebtReminder } from '../lib/notifications'
+import { hapticSuccess, hapticError, hapticLight } from '../lib/haptics'
 
 export default function Ventes() {
   const navigate = useNavigate()
@@ -178,16 +179,16 @@ export default function Ventes() {
   }
 
   const handleConfirm = async () => {
-    if (!selected) { setError('Sélectionne un produit'); return }
-    if (quantity <= 0) { setError('La quantité doit être supérieure à 0'); return }
+    if (!selected) { hapticError(); setError('Sélectionne un produit'); return }
+    if (quantity <= 0) { hapticError(); setError('La quantité doit être supérieure à 0'); return }
     if (quantity > selected.quantity) {
-      setError(`Stock insuffisant — ${selected.quantity} unités disponibles`); return
+      hapticError(); setError(`Stock insuffisant — ${selected.quantity} unités disponibles`); return
     }
     if (!canAddSale(userPlan, todaySalesCount)) {
-      setError(`Limite atteinte — ton plan permet ${getPlanLimits(userPlan).maxSalesPerDay} ventes par jour.`); return
+      hapticError(); setError(`Limite atteinte — ton plan permet ${getPlanLimits(userPlan).maxSalesPerDay} ventes par jour.`); return
     }
     if (payment === 'credit' && !selectedClient) {
-      setError('Sélectionne un client pour la vente à crédit'); return
+      hapticError(); setError('Sélectionne un client pour la vente à crédit'); return
     }
     setError('')
     setLoading(true)
@@ -242,6 +243,7 @@ export default function Ventes() {
     })
     await refreshPending()
 
+    hapticSuccess()
     setSuccess(true)
     setTodaySalesCount(prev => prev + 1)
 

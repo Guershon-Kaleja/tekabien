@@ -9,7 +9,21 @@
 
 button {
   outline: none;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, opacity 0.08s ease;
+}
+
+button:active {
+  transform: scale(0.96);
+  opacity: 0.85;
+}
+
+/* Momentum scrolling natif sur tous les conteneurs scrollables */
+.overflow-y-auto,
+.overflow-y-scroll,
+[class*="overflow-y"] {
+  -webkit-overflow-scrolling: touch;
 }
 
 html, body {

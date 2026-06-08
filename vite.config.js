@@ -6,7 +6,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 export default defineConfig({
   build: {
     rollupOptions: {
-      external: ['@capacitor/local-notifications'],
+      external: ['@capacitor/local-notifications', '@capacitor/haptics'],
     },
   },
   plugins: [

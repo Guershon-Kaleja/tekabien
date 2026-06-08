@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { hapticLight } from '../lib/haptics'
 
 const items = [
   { icon: '🏠', label: 'Accueil', path: '/' },
@@ -10,7 +11,13 @@ const items = [
 
 export default function Navbar() {
   const navigate = useNavigate()
-  const current = window.location.pathname
+  const { pathname } = useLocation()
+
+  const handleNav = (path) => {
+    if (pathname === path) return
+    hapticLight()
+    navigate(path)
+  }
 
   return (
     <div
@@ -20,18 +27,18 @@ export default function Navbar() {
       {items.map((item) => (
         <button
           key={item.path}
-          onClick={() => navigate(item.path)}
+          onClick={() => handleNav(item.path)}
           className="flex flex-col items-center gap-1 flex-1"
         >
-          <span className={`text-xl ${current === item.path ? 'scale-110' : ''}`}>
+          <span className={`text-xl transition-transform duration-150 ${pathname === item.path ? 'scale-110' : ''}`}>
             {item.icon}
           </span>
-          <span className={`text-xs font-medium ${
-            current === item.path ? 'text-[#1A56DB]' : 'text-[#64748B]'
+          <span className={`text-xs font-medium transition-colors duration-150 ${
+            pathname === item.path ? 'text-[#1A56DB]' : 'text-[#64748B]'
           }`}>
             {item.label}
           </span>
-          {current === item.path && (
+          {pathname === item.path && (
             <div className="w-1 h-1 rounded-full bg-[#1A56DB]" />
           )}
         </button>
