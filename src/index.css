@@ -44,3 +44,12 @@ input:focus {
   position: relative;
   z-index: 1;
 }
+
+@keyframes pageEnter {
+  from { opacity: 0.5; transform: translateY(3px); }
+  to   { opacity: 1;   transform: translateY(0); }
+}
+
+.page-enter {
+  animation: pageEnter 0.15s ease-out;
+}

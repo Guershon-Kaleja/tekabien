@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import { OfflineProvider } from './context/OfflineContext'
@@ -14,6 +14,27 @@ const Rapports = lazy(() => import('./pages/Rapports'))
 const Expired = lazy(() => import('./pages/Expired'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Profil = lazy(() => import('./pages/Profil'))
+
+function AppRoutes({ session }) {
+  const location = useLocation()
+  return (
+    <div key={location.pathname} className="page-enter">
+      <Routes>
+        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+        <Route path="/onboarding" element={session ? <Onboarding /> : <Navigate to="/login" />} />
+        <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
+        <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
+        <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
+        <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
+        <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
+        <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
+        <Route path="/expired" element={<Expired />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
+      </Routes>
+    </div>
+  )
+}
 
 function App() {
   const [session, setSession] = useState(null)
@@ -45,30 +66,11 @@ function App() {
   return (
     <BrowserRouter>
       <OfflineProvider>
-      <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
-        <Suspense fallback={
-          <div className="bg-[#EEF2F7] flex items-center justify-center" style={{ height: '100dvh' }}>
-            <div className="text-center">
-              <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
-              <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
-            </div>
-          </div>
-        }>
-          <Routes>
-            <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
-            <Route path="/onboarding" element={session ? <Onboarding /> : <Navigate to="/login" />} />
-            <Route path="/" element={session ? <Dashboard /> : <Navigate to="/login" />} />
-            <Route path="/ventes" element={session ? <Ventes /> : <Navigate to="/login" />} />
-            <Route path="/stocks" element={session ? <Stocks /> : <Navigate to="/login" />} />
-            <Route path="/clients" element={session ? <Clients /> : <Navigate to="/login" />} />
-            <Route path="/depenses" element={session ? <Depenses /> : <Navigate to="/login" />} />
-            <Route path="/rapports" element={session ? <Rapports /> : <Navigate to="/login" />} />
-            <Route path="/expired" element={<Expired />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
-          </Routes>
-        </Suspense>
-      </div>
+        <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
+          <Suspense fallback={<div className="min-h-screen bg-[#EEF2F7]" />}>
+            <AppRoutes session={session} />
+          </Suspense>
+        </div>
       </OfflineProvider>
     </BrowserRouter>
   )

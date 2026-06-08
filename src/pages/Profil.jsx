@@ -107,6 +107,10 @@ export default function Profil() {
   }
 
   const handleChangePassword = async () => {
+    if (!isOnline) {
+      setPasswordError('Connexion internet requise pour changer le mot de passe')
+      return
+    }
     if (!passwordForm.new || passwordForm.new.length < 6) {
       setPasswordError('Le mot de passe doit avoir au moins 6 caractères')
       return
@@ -152,7 +156,8 @@ export default function Profil() {
   }
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    // scope:'local' fonctionne même hors connexion — efface la session locale
+    await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
     navigate('/login')
   }
 
@@ -291,6 +296,11 @@ export default function Profil() {
             >
               Se déconnecter
             </button>
+            {!isOnline && (
+              <p className="text-xs text-center text-[#64748B] mt-1">
+                📶 La déconnexion sera locale — serveur mis à jour à la reconnexion
+              </p>
+            )}
 
             <button
               onClick={() => setShowDeleteAccount(true)}
@@ -306,6 +316,12 @@ export default function Profil() {
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
               Changer le mot de passe
             </p>
+            {!isOnline && (
+              <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                <span>📶</span>
+                <p className="text-xs text-[#B45309]">Connexion internet requise pour modifier le mot de passe</p>
+              </div>
+            )}
             {passwordSuccess && (
               <div className="bg-[#F0FDF4] border border-green-200 rounded-xl p-3 mb-4">
                 <p className="text-xs text-[#16A34A] font-medium">{passwordSuccess}</p>
