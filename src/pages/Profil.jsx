@@ -6,10 +6,12 @@ import Header from '../components/Header'
 import Navbar from '../components/Navbar'
 import { UserContext } from '../context/UserContext'
 import { hapticLight, hapticSuccess, hapticError } from '../lib/haptics'
+import { useOffline } from '../context/OfflineContext'
 
 export default function Profil() {
   const navigate = useNavigate()
   const { userId, shopName, userPlan: ctxPlan, currency: ctxCurrency, setCurrency: setContextCurrency } = useContext(UserContext)
+  const { isOnline } = useOffline()
   const [saving, setSaving] = useState(false)
   const [user, setUser] = useState(null)
   // Pré-rempli depuis le cache UserContext — affichage immédiat
@@ -410,17 +412,37 @@ export default function Profil() {
             </div>
 
             {(userPlan === 'trial' || userPlan === 'free') && (
-              <button onClick={() => navigate('/expired')}
-                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-3">
-                Passer au Pro — 5$/mois
-              </button>
+              <>
+                <button
+                  onClick={() => isOnline ? navigate('/expired') : null}
+                  disabled={!isOnline}
+                  className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
+                >
+                  Passer au Pro — 5$/mois
+                </button>
+                {!isOnline && (
+                  <p className="text-xs text-center text-[#64748B] mb-3">
+                    📶 Connexion internet requise pour effectuer un paiement
+                  </p>
+                )}
+              </>
             )}
 
             {userPlan === 'pro' && (
-              <button onClick={() => navigate('/expired')}
-                className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-3">
-                Renouveler mon abonnement
-              </button>
+              <>
+                <button
+                  onClick={() => isOnline ? navigate('/expired') : null}
+                  disabled={!isOnline}
+                  className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
+                >
+                  Renouveler mon abonnement
+                </button>
+                {!isOnline && (
+                  <p className="text-xs text-center text-[#64748B] mb-3">
+                    📶 Connexion internet requise pour effectuer un paiement
+                  </p>
+                )}
+              </>
             )}
 
             {(userPlan === 'trial' || userPlan === 'free') && (
