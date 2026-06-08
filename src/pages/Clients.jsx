@@ -222,6 +222,61 @@ const handlePartialPay = async () => {
   }
 }
 
+const handleAddDebt = async () => {
+  const amount = parseFloat(debtForm.amount)
+  if (!amount || amount <= 0) {
+    setDebtErrors({ amount: 'Le montant doit être supérieur à 0' }); return
+  }
+  setDebtErrors({})
+
+  const newTotal = (selectedClient.total_debt || 0) + amount
+  const debtRecord = {
+    id: crypto.randomUUID(),
+    user_id: contextUserId,
+    customer_id: selectedClient.id,
+    amount,
+    paid: 0,
+    status: 'pending',
+    note: sanitize(debtForm.note) || null,
+    due_date: debtForm.due_date || null,
+  }
+
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? { ...c, total_debt: newTotal } : c))
+  setShowDebtForm(false)
+  setDebtForm({ amount: '', note: '', due_date: '' })
+
+  await localDb.debts.put(debtRecord)
+  await localDb.customers.update(selectedClient.id, { total_debt: newTotal })
+  await addToQueue('debt_insert', { debt: debtRecord, customerId: selectedClient.id, newTotal })
+  await refreshPending()
+
+  if (isOnline) {
+    await supabase.from('debts').upsert(debtRecord)
+    await supabase.from('customers').update({ total_debt: newTotal }).eq('id', selectedClient.id)
+  }
+}
+
+const handleEditDebt = async () => {
+  const amount = parseFloat(editDebtAmount)
+  if (isNaN(amount) || amount < 0) return
+
+  const updatedClient = { ...selectedClient, total_debt: amount }
+  setClients(prev => prev.map(c => c.id === selectedClient.id ? updatedClient : c))
+  setShowEditDebt(false)
+
+  await localDb.customers.update(selectedClient.id, { total_debt: amount })
+  await addToQueue('customer_update', updatedClient)
+  await refreshPending()
+
+  if (isOnline) {
+    await supabase.from('customers').update({ total_debt: amount }).eq('id', selectedClient.id)
+    if (amount === 0) {
+      await supabase.from('debts').update({ status: 'paid' })
+        .eq('customer_id', selectedClient.id).eq('status', 'pending')
+    }
+  }
+}
+
 const handleFullPay = async (client) => {
   setClients(prev => prev.map(c => c.id === client.id ? { ...c, total_debt: 0, total_paid: (c.total_paid || 0) + c.total_debt } : c))
 
