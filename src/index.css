@@ -1,12 +1,27 @@
 @import "tailwindcss";
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   user-select: none;
 }
 
+html, body {
+  background-color: #1A56DB;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  background-color: #EEF2F7;
+}
+
+/* Boutons — feedback tactile natif */
 button {
   outline: none;
   touch-action: manipulation;
@@ -14,30 +29,28 @@ button {
   transition: transform 0.08s ease, opacity 0.08s ease;
 }
 
-button:active {
+button:not(:disabled):active {
   transform: scale(0.96);
-  opacity: 0.85;
+  opacity: 0.82;
 }
 
-/* Momentum scrolling natif sur tous les conteneurs scrollables */
+button:disabled {
+  cursor: not-allowed;
+  transform: none !important;
+  opacity: inherit;
+}
+
+/* Momentum scrolling natif iOS */
 .overflow-y-auto,
-.overflow-y-scroll,
-[class*="overflow-y"] {
+.overflow-y-scroll {
   -webkit-overflow-scrolling: touch;
 }
 
-html, body {
-  background-color: #1A56DB;
-  overscroll-behavior: none;
-}
-
-#root {
-  background-color: #EEF2F7;
-}
-
+/* Inputs — taille min 16px pour éviter le zoom auto sur iOS */
 input, textarea, select {
   font-size: 16px !important;
   user-select: text;
+  -webkit-font-smoothing: antialiased;
 }
 
 input:focus {
@@ -45,11 +58,7 @@ input:focus {
   z-index: 1;
 }
 
-@keyframes pageEnter {
-  from { opacity: 0.5; transform: translateY(3px); }
-  to   { opacity: 1;   transform: translateY(0); }
-}
-
-.page-enter {
-  animation: pageEnter 0.15s ease-out;
+/* Supprime le focus outline partout sauf clavier */
+:focus:not(:focus-visible) {
+  outline: none;
 }

@@ -301,21 +301,18 @@ export default function Profil() {
 
             <button
               onClick={() => setShowLogoutConfirm(true)}
-              className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm"
+              disabled={!isOnline}
+              className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm disabled:opacity-40 disabled:border-gray-200 disabled:text-gray-400"
             >
-              Se déconnecter
+              {!isOnline ? '📶 Connexion requise' : 'Se déconnecter'}
             </button>
-            {!isOnline && (
-              <p className="text-xs text-center text-[#64748B] mt-1">
-                📶 La déconnexion sera locale — serveur mis à jour à la reconnexion
-              </p>
-            )}
 
             <button
               onClick={() => setShowDeleteAccount(true)}
-              className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm mt-3"
+              disabled={!isOnline}
+              className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm mt-3 disabled:opacity-40 disabled:border-gray-200 disabled:text-gray-400"
             >
-              🗑️ Supprimer mon compte
+              {!isOnline ? '📶 Connexion requise' : '🗑️ Supprimer mon compte'}
             </button>
           </>
         )}
