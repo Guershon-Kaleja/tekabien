@@ -4,7 +4,6 @@ import { localDb } from '../lib/localDb'
 import { addToQueue } from '../lib/syncEngine'
 import { validateExpense, sanitize } from '../lib/validation'
 import Header from '../components/Header'
-import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
@@ -507,8 +506,6 @@ export default function Depenses() {
             </div>
           </div>
         )}
-
-      <Navbar />
 
     </div>
   )

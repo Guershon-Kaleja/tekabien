@@ -2,7 +2,6 @@ import { useEffect, useState, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { localDb } from '../lib/localDb'
-import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
@@ -365,8 +364,6 @@ export default function Dashboard() {
         )}
 
       </div>
-
-      <Navbar />
 
     </div>
   )

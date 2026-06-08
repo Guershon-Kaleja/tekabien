@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { localDb } from '../lib/localDb'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Header from '../components/Header'
-import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import jsPDF from 'jspdf'
@@ -662,8 +661,6 @@ export default function Rapports() {
           </div>
         </div>
       )}
-
-      <Navbar />
 
     </div>
   )

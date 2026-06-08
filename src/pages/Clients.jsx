@@ -5,7 +5,6 @@ import { addToQueue } from '../lib/syncEngine'
 import { sanitize } from '../lib/validation'
 import { canAddClient, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
-import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
@@ -748,8 +747,6 @@ const handleFullPay = async (client) => {
           </div>
         </div>
       )}
-
-      <Navbar />
 
     </div>
   )

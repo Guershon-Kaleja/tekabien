@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { sanitize } from '../lib/validation'
 import Header from '../components/Header'
-import Navbar from '../components/Navbar'
 import { UserContext } from '../context/UserContext'
 import { hapticLight, hapticSuccess, hapticError } from '../lib/haptics'
 import { useOffline } from '../context/OfflineContext'
@@ -218,6 +217,13 @@ export default function Profil() {
               </div>
             )}
 
+            {!isOnline && (
+              <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                <span>📶</span>
+                <p className="text-xs text-[#B45309]">Connexion requise pour modifier ton profil</p>
+              </div>
+            )}
+
             <div className="bg-white rounded-xl border border-gray-200 p-4 mb-4">
               <p className="text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-4">
                 Informations de ton activité
@@ -229,9 +235,10 @@ export default function Profil() {
                   </label>
                   <input
                     value={form.shop_name}
-                    onChange={(e) => { setForm({ ...form, shop_name: e.target.value }); setError('') }}
+                    onChange={(e) => { if (isOnline) { setForm({ ...form, shop_name: e.target.value }); setError('') } }}
+                    disabled={!isOnline}
                     placeholder="Ex: Ventes en ligne, Salon Merveille..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                    className={`w-full border rounded-xl px-3 py-3 text-sm outline-none ${isOnline ? 'border-gray-200 text-[#0F172A] focus:border-[#1A56DB]' : 'border-gray-100 bg-gray-50 text-[#64748B] cursor-not-allowed'}`}
                   />
                 </div>
                 <div>
@@ -240,9 +247,10 @@ export default function Profil() {
                   </label>
                   <input
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) => { if (isOnline) setForm({ ...form, phone: e.target.value }) }}
+                    disabled={!isOnline}
                     placeholder="+243 8X XXX XXXX"
-                    className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm text-[#0F172A] outline-none focus:border-[#1A56DB]"
+                    className={`w-full border rounded-xl px-3 py-3 text-sm outline-none ${isOnline ? 'border-gray-200 text-[#0F172A] focus:border-[#1A56DB]' : 'border-gray-100 bg-gray-50 text-[#64748B] cursor-not-allowed'}`}
                   />
                 </div>
                 <div>
@@ -258,7 +266,7 @@ export default function Profil() {
                   <label className="block text-xs font-semibold text-[#64748B] uppercase tracking-wide mb-2">
                     Devise de la boutique
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={`grid grid-cols-2 gap-3 ${!isOnline ? 'opacity-50 pointer-events-none' : ''}`}>
                     {[
                       { id: 'FC', label: 'Franc Congolais', symbol: 'FC', desc: 'Ex: 5 000 FC' },
                       { id: 'USD', label: 'Dollar américain', symbol: '$', desc: 'Ex: $2.50' },
@@ -266,6 +274,7 @@ export default function Profil() {
                       <button
                         key={c.id}
                         onClick={() => setForm({ ...form, currency: c.id })}
+                        disabled={!isOnline}
                         className={`p-3 rounded-xl border-2 text-left transition-all ${
                           form.currency === c.id ? 'border-[#1A56DB] bg-[#EBF2FF]' : 'border-gray-200 bg-white'
                         }`}
@@ -283,10 +292,10 @@ export default function Profil() {
               </div>
               <button
                 onClick={handleSaveProfile}
-                disabled={saving}
+                disabled={saving || !isOnline}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
               >
-                {saving ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
+                {saving ? 'Sauvegarde...' : !isOnline ? '📶 Connexion requise' : 'Sauvegarder les modifications'}
               </button>
             </div>
 
@@ -340,9 +349,10 @@ export default function Profil() {
                 <input
                   type="password"
                   value={passwordForm.new}
-                  onChange={(e) => { setPasswordForm({ ...passwordForm, new: e.target.value }); setPasswordError('') }}
+                  onChange={(e) => { if (isOnline) { setPasswordForm({ ...passwordForm, new: e.target.value }); setPasswordError('') } }}
+                  disabled={!isOnline}
                   placeholder="Minimum 6 caractères"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
+                  className={`w-full border rounded-xl px-3 py-3 text-sm outline-none ${isOnline ? 'border-gray-200 focus:border-[#1A56DB]' : 'border-gray-100 bg-gray-50 text-[#64748B] cursor-not-allowed'}`}
                 />
               </div>
               <div>
@@ -352,18 +362,19 @@ export default function Profil() {
                 <input
                   type="password"
                   value={passwordForm.confirm}
-                  onChange={(e) => { setPasswordForm({ ...passwordForm, confirm: e.target.value }); setPasswordError('') }}
+                  onChange={(e) => { if (isOnline) { setPasswordForm({ ...passwordForm, confirm: e.target.value }); setPasswordError('') } }}
+                  disabled={!isOnline}
                   placeholder="Répète ton nouveau mot de passe"
-                  className="w-full border border-gray-200 rounded-xl px-3 py-3 text-sm outline-none focus:border-[#1A56DB]"
+                  className={`w-full border rounded-xl px-3 py-3 text-sm outline-none ${isOnline ? 'border-gray-200 focus:border-[#1A56DB]' : 'border-gray-100 bg-gray-50 text-[#64748B] cursor-not-allowed'}`}
                 />
               </div>
             </div>
             <button
               onClick={handleChangePassword}
-              disabled={saving}
+              disabled={saving || !isOnline}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
             >
-              {saving ? 'Mise à jour...' : 'Changer le mot de passe'}
+              {saving ? 'Mise à jour...' : !isOnline ? '📶 Connexion requise' : 'Changer le mot de passe'}
             </button>
           </div>
         )}
@@ -589,8 +600,6 @@ export default function Profil() {
           </div>
         </div>
       )}
-
-      <Navbar />
     </div>
   )
 }

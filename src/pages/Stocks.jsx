@@ -6,7 +6,6 @@ import { addToQueue } from '../lib/syncEngine'
 import { validateProduct, sanitize } from '../lib/validation'
 import { canAddProduct, getPlanLimits } from '../lib/planLimits'
 import Header from '../components/Header'
-import Navbar from '../components/Navbar'
 import usePlanCheck from '../hooks/usePlanCheck'
 import useCurrency from '../hooks/useCurrency'
 import { UserContext } from '../context/UserContext'
@@ -531,8 +530,6 @@ export default function Stocks() {
           </div>
         </div>
       )}
-
-      <Navbar />
 
     </div>
   )

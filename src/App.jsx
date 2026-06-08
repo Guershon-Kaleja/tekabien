@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import { OfflineProvider } from './context/OfflineContext'
+import Navbar from './components/Navbar'
 
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
@@ -15,10 +16,14 @@ const Expired = lazy(() => import('./pages/Expired'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Profil = lazy(() => import('./pages/Profil'))
 
+const NO_NAVBAR = ['/login', '/onboarding', '/expired', '/reset-password']
+
 function AppRoutes({ session }) {
-  const location = useLocation()
+  const { pathname } = useLocation()
+  const showNavbar = session && !NO_NAVBAR.includes(pathname)
+
   return (
-    <div key={location.pathname} className="page-enter">
+    <>
       <Routes>
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
         <Route path="/onboarding" element={session ? <Onboarding /> : <Navigate to="/login" />} />
@@ -32,7 +37,8 @@ function AppRoutes({ session }) {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/profil" element={session ? <Profil /> : <Navigate to="/login" />} />
       </Routes>
-    </div>
+      {showNavbar && <Navbar />}
+    </>
   )
 }
 
