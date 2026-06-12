@@ -3,6 +3,7 @@ import { useEffect, useState, lazy, Suspense } from 'react'
 import { supabase } from './lib/supabase'
 import { OfflineProvider } from './context/OfflineContext'
 import Navbar from './components/Navbar'
+import SplashScreen from './components/SplashScreen'
 
 const Login = lazy(() => import('./pages/Login'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
@@ -44,12 +45,13 @@ function AppRoutes({ session }) {
 
 function App() {
   const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [authReady, setAuthReady] = useState(false)
+  const [splashDone, setSplashDone] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-      setLoading(false)
+      setAuthReady(true)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => setSession(session)
@@ -57,28 +59,23 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center">
-        <div className="text-center">
-          <img src="/icon-192.png" alt="TekaBien" className="w-16 h-16 rounded-2xl mx-auto mb-4" />
-          <p className="text-[#1A56DB] font-bold text-xl">TekaBien</p>
-          <p className="text-[#64748B] text-sm mt-1">Chargement...</p>
-        </div>
-      </div>
-    )
-  }
+  const showSplash = !splashDone || !authReady
 
   return (
-    <BrowserRouter>
-      <OfflineProvider>
-        <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
-          <Suspense fallback={<div className="min-h-screen bg-[#EEF2F7]" />}>
-            <AppRoutes session={session} />
-          </Suspense>
-        </div>
-      </OfflineProvider>
-    </BrowserRouter>
+    <>
+      {showSplash && <SplashScreen onDone={() => setSplashDone(true)} />}
+      {authReady && (
+        <BrowserRouter>
+          <OfflineProvider>
+            <div className="max-w-md mx-auto bg-[#EEF2F7] min-h-screen">
+              <Suspense fallback={<div className="min-h-screen bg-[#EEF2F7]" />}>
+                <AppRoutes session={session} />
+              </Suspense>
+            </div>
+          </OfflineProvider>
+        </BrowserRouter>
+      )}
+    </>
   )
 }
 
