@@ -295,7 +295,7 @@ export default function Profil() {
                 disabled={saving || !isOnline}
                 className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
               >
-                {saving ? 'Sauvegarde...' : !isOnline ? '📶 Connexion requise' : 'Sauvegarder les modifications'}
+                {saving ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
               </button>
             </div>
 
@@ -304,7 +304,7 @@ export default function Profil() {
               disabled={!isOnline}
               className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm disabled:opacity-40 disabled:border-gray-200 disabled:text-gray-400"
             >
-              {!isOnline ? '📶 Connexion requise' : 'Se déconnecter'}
+              Se déconnecter
             </button>
 
             <button
@@ -312,7 +312,7 @@ export default function Profil() {
               disabled={!isOnline}
               className="w-full bg-white border border-red-200 text-[#DC2626] rounded-xl py-3 font-semibold text-sm mt-3 disabled:opacity-40 disabled:border-gray-200 disabled:text-gray-400"
             >
-              {!isOnline ? '📶 Connexion requise' : '🗑️ Supprimer mon compte'}
+              🗑️ Supprimer mon compte
             </button>
           </>
         )}
@@ -371,7 +371,7 @@ export default function Profil() {
               disabled={saving || !isOnline}
               className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
             >
-              {saving ? 'Mise à jour...' : !isOnline ? '📶 Connexion requise' : 'Changer le mot de passe'}
+              {saving ? 'Mise à jour...' : 'Changer le mot de passe'}
             </button>
           </div>
         )}
