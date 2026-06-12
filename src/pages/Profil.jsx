@@ -293,7 +293,7 @@ export default function Profil() {
               <button
                 onClick={handleSaveProfile}
                 disabled={saving || !isOnline}
-                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
+                className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:bg-gray-200 disabled:text-gray-400"
               >
                 {saving ? 'Sauvegarde...' : 'Sauvegarder les modifications'}
               </button>
@@ -369,7 +369,7 @@ export default function Profil() {
             <button
               onClick={handleChangePassword}
               disabled={saving || !isOnline}
-              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:opacity-50"
+              className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mt-4 disabled:bg-gray-200 disabled:text-gray-400"
             >
               {saving ? 'Mise à jour...' : 'Changer le mot de passe'}
             </button>
@@ -378,6 +378,12 @@ export default function Profil() {
 
         {activeTab === 'abonnement' && (
           <>
+            {!isOnline && (
+              <div className="bg-[#FFFBEB] border border-yellow-200 rounded-xl p-3 mb-4 flex items-center gap-2">
+                <span>📶</span>
+                <p className="text-xs text-[#B45309]">Connexion internet requise pour gérer l'abonnement</p>
+              </div>
+            )}
             <div className="rounded-xl p-4 mb-4 border"
               style={{ background: getPlanBg(userPlan), borderColor: getPlanColor(userPlan) + '40' }}>
               <div className="flex items-center justify-between mb-3">
@@ -440,15 +446,10 @@ export default function Profil() {
                 <button
                   onClick={() => isOnline ? navigate('/expired') : null}
                   disabled={!isOnline}
-                  className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
+                  className="w-full bg-[#1A56DB] text-white rounded-xl py-3 font-semibold text-sm mb-2 disabled:bg-gray-200 disabled:text-gray-400"
                 >
                   Passer au Pro — 5$/mois
                 </button>
-                {!isOnline && (
-                  <p className="text-xs text-center text-[#64748B] mb-3">
-                    📶 Connexion internet requise pour effectuer un paiement
-                  </p>
-                )}
               </>
             )}
 
@@ -457,15 +458,10 @@ export default function Profil() {
                 <button
                   onClick={() => isOnline ? navigate('/expired') : null}
                   disabled={!isOnline}
-                  className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-2 disabled:opacity-50"
+                  className="w-full bg-white border border-[#1A56DB] text-[#1A56DB] rounded-xl py-3 font-semibold text-sm mb-2 disabled:bg-gray-100 disabled:border-gray-200 disabled:text-gray-400"
                 >
                   Renouveler mon abonnement
                 </button>
-                {!isOnline && (
-                  <p className="text-xs text-center text-[#64748B] mb-3">
-                    📶 Connexion internet requise pour effectuer un paiement
-                  </p>
-                )}
               </>
             )}
 
